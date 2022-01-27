@@ -52,8 +52,7 @@ namespace FortnoxApiExample.Controllers
             }
             catch (Exception ex)
             {
-                //ViewData["ErrorMessage"] = ex.Message;
-                throw ex;
+                ViewData["ErrorMessage"] = ex.Message;
             }
         }
 
@@ -61,13 +60,8 @@ namespace FortnoxApiExample.Controllers
 
         private void CreateCustomer(FortnoxContext context)
         {
-            var client = new FortnoxClient(new StandardAuth(context.GetAccessToken()));
-            var customerConn = client.CustomerConnector;
-            /*
             var customerConn = context.CustomerConnector;
-            //Customer customer = Inputs.CreateCustomer(customerConnector).Result;
-            */
-            CustomerSubset customer = customerConn.FindAsync(null).Result.Entities.FirstOrDefault();
+            Customer customer = Inputs.CreateCustomer(customerConn).Result;
 
             ViewData["CustomerInfo"] = "Customer with ID: " + customer.CustomerNumber + " created successfully.";
             ViewData["CustomerId"] = customer.CustomerNumber;
