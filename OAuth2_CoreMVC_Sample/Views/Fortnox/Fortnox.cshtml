@@ -1,0 +1,41 @@
+﻿@{
+}
+
+@if(ViewData["FortnoxError"] != null) {
+    <div style="text-danger">@Html.Raw(ViewData["FortnoxError"])</div>
+}
+@if(ViewData["ErrorMessage"] != null) {
+    <br/>
+    <div style="text-danger">@Html.Raw(ViewData["ErrorMessage"])</div>
+}
+
+<a asp-controller="Fortnox" asp-action="CreateCustomer">
+    <div>
+        <input type="submit" name="customerBtn" value="Create Customer"/>
+    </div>
+</a>
+<br/>
+
+@if (ViewData["CustomerId"] != null)
+{
+    @Html.Raw(ViewData["CustomerInfo"])
+    <br/>
+
+    <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerId="@ViewData["CustomerId"]">
+        <div>
+            <input type="submit" name="invoiceBtn" value="Create Invoice"/>
+        </div>
+    </a>
+}
+<br/>
+
+<a asp-controller="Fortnox" asp-action="CreateCustomerAndInvoice">
+        <div>
+            <input type="submit" name="invoiceBtn" value="Create Customer & Invoice"/>
+        </div>
+    </a>
+
+@if (ViewData["InvoiceInfo"] != null)
+{
+    @Html.Raw(ViewData["InvoiceInfo"])
+}

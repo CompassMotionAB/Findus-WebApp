@@ -1,0 +1,16 @@
+﻿<div class="jumbotron">
+    <h2>Fortnox Sample Application</h2>
+    <h2>Demonstrates how to Connect to Fortnox with OAuth2 and basic API (Customer and Invoice) request</h2>
+</div>
+
+<a asp-action="Login" asp-controller="Connect" asp-route-connect="Connect to Fortnox">
+    <img src="~/Images/C2FNX_white_btn_lg_default.png" width="200" height="40"/>
+</a>
+
+@if ((string)ViewData["Configuration"] == "NullValue")
+{
+    <p style="font-weight:normal;color:red">
+        <br/>
+        Please verify the Client Id and Client Secret value in appsettings.json file.
+    </p>
+}
