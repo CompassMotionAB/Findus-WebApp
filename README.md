@@ -26,14 +26,15 @@ and optionally:
 5. Fortnox Token Endpoint - "/oauth-v1/token"
 6. Fortnox [Scopes](https://developer.fortnox.se/general/scopes)
   Valid formats are case-insensitive string arrays, i.e:
+  
    `"Scopes": ["companyinformation", "invoices", "customers", "article"]`
 
 ### DBConnectionString
 This sample app uses a SQLite database to store the tokens(AccessToken and RefreshToken) used for doing our API calls and also update the token with new tokens when the token expires.
 This database is created for you the first time your run the sample.
 
-### Connect To QuickBooks 
+### Connect To Fortnox 
 This flow goes through authorization flow where Fortnox user logs in and authorizes your app. At the end of this process, the app will end up with tokens and if you are a first time user it will create new tokens in the database and if you a recurring user and if your tokens are expired then it will update the database.
 
 ### Fortnox API request
-Access tokens from Connect to QuickBooks flow are used to make a Customer and Invoice request which allows to create a customer and invoice in your company. If any tokens are expired, then it refresh those tokens based on the refresh token.
+Access tokens from Connect to Fortnox flow are used to make a Customer and Invoice request which allows to create a customer and invoice in your company. If any tokens are expired, then it refresh those tokens based on the refresh token.
