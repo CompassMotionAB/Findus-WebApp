@@ -1,35 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using Fortnox.SDK.Auth;
-using Newtonsoft.Json;
 
 namespace FortnoxApiExample.Helper
 {
-    public static class Utilities
+    public static class EnumerableExtensions
     {
-        public static T LoadJson<T>(string jsonFilePath, JsonConverter jsonConverter = null)
-        {
-            using (StreamReader r = new StreamReader(jsonFilePath))
-            {
-                string json = r.ReadToEnd();
-                return JsonConvert.DeserializeObject<T>(json, jsonConverter);
-            }
-        }
-        public static String JoinToLower(this IEnumerable<string> list, String delimiter)
+        public static String JoinToLower<T>(this IEnumerable<T> list, String delimiter)
         {
             StringBuilder sb = new StringBuilder();
-            foreach (String item in list)
-            {
-                sb.Append(item.ToLower());
-            }
-            return sb.ToString();
-        }
-        public static String JoinToLower(this IEnumerable<Scope> list, String delimiter)
-        {
-            StringBuilder sb = new StringBuilder();
-            foreach (Scope item in list)
+            foreach (T item in list)
             {
                 sb.Append(item.ToString().ToLower());
             }
@@ -46,7 +26,7 @@ namespace FortnoxApiExample.Helper
 		/// </remarks>
 		/// <param name="array">The array to generate a hash code for.</param>
 		/// <returns>The hash code for the values in the array.</returns>
-		public static int GetHashCode(Scope[] array)
+		public static int GetUniqueHashForEnumerable<T>(this IEnumerable<T> array)
         {
             // if non-null array then go into unchecked block to avoid overflow
             if (array != null)

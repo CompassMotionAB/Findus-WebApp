@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using Fortnox.SDK.Auth;
-
-namespace FortnoxApiExample.Models
+﻿namespace FortnoxApiExample.Models
 {
     public class Token
     {

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -42,7 +42,6 @@ namespace FortnoxApiExample
 
             services.AddHttpContextAccessor();
 
-            //services.AddTransient<ICustomAuthenticationService, FortnoxAuthenticationService>();
             services.AddFortnoxAuthorization(Configuration);
 
             services.AddDbContext<TokensContext>(options => options.UseSqlite(Configuration.GetConnectionString("DBConnectionString")));
@@ -51,11 +50,7 @@ namespace FortnoxApiExample
 
             services.AddSingleton(provider => Configuration);
 
-            services.AddControllersWithViews(
-            /*options => {
-                options.Filters.Add(new AuthorizeFilter(new AuthorizeData[] { new AuthorizeData { AuthenticationSchemes = Constants.FortnoxScheme }}));
-            }*/
-            );
+            services.AddControllersWithViews();
             
         }
 

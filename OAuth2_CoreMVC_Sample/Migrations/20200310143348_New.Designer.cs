@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using FortnoxApiExample.Models;
 
 namespace FortnoxApiExample.Migrations
@@ -23,9 +22,9 @@ namespace FortnoxApiExample.Migrations
                         .HasColumnType("TEXT")
                         .HasMaxLength(50);
 
-                    b.Property<string>("ScopeHash")
+                    b.Property<int>("ScopeHash")
                         .IsRequired()
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AccessToken")
                         .IsRequired()

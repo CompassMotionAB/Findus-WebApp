@@ -16,24 +16,18 @@
 </a>
 <br/>
 
-@if (ViewData["CustomerId"] != null)
+@if (ViewData["CustomerNr"] != null)
 {
     @Html.Raw(ViewData["CustomerInfo"])
     <br/>
 
-    <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerId="@ViewData["CustomerId"]">
+    <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerNr="@ViewData["CustomerNr"]">
         <div>
             <input type="submit" name="invoiceBtn" value="Create Invoice"/>
         </div>
     </a>
 }
 <br/>
-
-<a asp-controller="Fortnox" asp-action="CreateCustomerAndInvoice">
-        <div>
-            <input type="submit" name="invoiceBtn" value="Create Customer & Invoice"/>
-        </div>
-    </a>
 
 @if (ViewData["InvoiceInfo"] != null)
 {

@@ -1,12 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Fortnox.SDK;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using FortnoxApiExample.Helper;
 using FortnoxApiExample.Models;
 using FortnoxApiExample.Security.Fortnox;
-using Fortnox.SDK.Auth;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
 using System.Linq;
@@ -37,12 +35,19 @@ namespace FortnoxApiExample.Controllers
         // GET: /<controller>/
         public async Task<ActionResult> Index()
         {
-            var state = Request.Query["state"];
+            string state = Request.Query["state"];
             var code = Request.Query["code"].ToString();
 
-            if (state.Count > 0 && !string.IsNullOrEmpty(code))
+            if (!string.IsNullOrEmpty(state) && !string.IsNullOrEmpty(code))
             {
                 await GetAuthTokensAsync(code);
+                // Get own redirectUrl from state;
+                string[] stateParams = state.Split(";");
+                if (stateParams.Length > 1)
+                {
+                    var redirectUrl = stateParams[1];
+                    return Redirect(HttpContext.GenerateFullDomain() + redirectUrl);
+                }
                 return RedirectToAction("Index", "Fortnox");
             }
 
@@ -55,25 +60,14 @@ namespace FortnoxApiExample.Controllers
             if (!string.IsNullOrEmpty(_auth2Keys.ClientId) && !string.IsNullOrEmpty(_auth2Keys.ClientSecret))
             {
                 var scopes = _fortnoxSettings.Scopes;
-                // TODO: Skip login if user is already authenticated against Fortnox WITH current scopes
-                // <-----
-                /*
-                await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-                var token = _tokens.Token;
-
-                if (token != null)
-                {
-                    _tokens.Remove(token);
-                    await _tokens.SaveChangesAsync();
-                }
-                */
-                // ----->
+                // TODO: Add User with correct Claims to Fortnox scopes
+                // TODO: Skip login if user is already authenticated with correct scopeHash
+                // var scopeHash = scopes.GetUniqueHashForEnumerable() 
 
                 var authWorkflow = fortnoxAuthClient.StandardAuthWorkflow;
                 _fortnoxState = authWorkflow.GenerateState();
 
-                // Store custom returnUrl in state.
+                // Store own returnUrl in state.
                 _fortnoxState = GenerateState(_fortnoxState, redirectUrl);
 
                 var authorizeUrl = authWorkflow.BuildAuthUri(_auth2Keys.ClientId, scopes, _fortnoxState, HttpContext.GenerateFullDomain() + _auth2Keys.CallbackPath);
@@ -83,6 +77,18 @@ namespace FortnoxApiExample.Controllers
 
             ViewData["Configuration"] = "NullValue";
             return View("Connect");
+        }
+        [HttpGet]
+        public async Task<IActionResult> LogoutAsync(string redirectUrl = null)
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            _tokens.Token.RemoveRange(_tokens.Token);
+            await _tokens.SaveChangesAsync();
+            if (!string.IsNullOrEmpty(redirectUrl))
+            {
+                return Redirect(redirectUrl);
+            }
+            return RedirectToAction("Index", "Home");
         }
         private string GenerateState(string state = null, string redirectUrl = null)
         {
@@ -106,7 +112,7 @@ namespace FortnoxApiExample.Controllers
                 _tokens.Add(new Token
                 {
                     RealmId = "fortnox",
-                    ScopeHash = _fortnoxSettings.Scopes.GetHashCode(),
+                    ScopeHash = _fortnoxSettings.Scopes.GetUniqueHashForEnumerable(),
                     AccessToken = tokenResponse.AccessToken,
                     RefreshToken = tokenResponse.RefreshToken
                 });
