@@ -12,8 +12,6 @@ namespace FortnoxApiExample.Services.Fortnox
         void OnActionExecuted(ActionExecutedContext context);
         void OnActionExecuting(ActionExecutingContext context);
     }
-
-    
     public interface IFortnoxServices
     {
         Task FortnoxApiCall(Action<FortnoxContext> apiCallFunction);

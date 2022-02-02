@@ -10,7 +10,7 @@ using FortnoxApiExample.Models;
 
 namespace FortnoxApiExample
 {
-    public class Program
+    static public class Progam
     {
         public static void Main(string[] args)
         {
@@ -38,9 +38,6 @@ namespace FortnoxApiExample
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                });
+                .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>());
     }
 }

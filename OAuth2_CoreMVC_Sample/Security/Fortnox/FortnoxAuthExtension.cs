@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using FortnoxApiExample.Helper;
 using Microsoft.AspNetCore.Authentication.OAuth;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +16,6 @@ namespace FortnoxApiExample.Security.Fortnox
         private static FortnoxSettings _fortnoxSettings;
         public static IServiceCollection AddFortnoxAuthorization(this IServiceCollection serviceCollection, IConfiguration configuration)
         {
-
             _fortnoxSettings = configuration.GetSection(FortnoxSettings.Name).Get<FortnoxSettings>();
             OAuth2Keys auth2keys = configuration.GetSection(OAuth2Keys.Name).Get<OAuth2Keys>();
 
@@ -36,7 +34,6 @@ namespace FortnoxApiExample.Security.Fortnox
                 throw new System.Exception("Fortnox Scopes must be provided in appsettings.json. See ./appsettings.sample.json");
             }
 
-
             var clientId = auth2keys.ClientId;
             var clientSecret = auth2keys.ClientSecret;
             var callbackPath = auth2keys.CallbackPath;
@@ -52,14 +49,8 @@ namespace FortnoxApiExample.Security.Fortnox
             }
 
             serviceCollection
-            .AddAuthorization(options =>
-            {
-                options.AddFortnoxAuthPolicy();
-            })
             .AddAuthentication(options =>
             {
-                //options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                //options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
                 options.DefaultAuthenticateScheme = Constants.FortnoxScheme;
                 options.DefaultChallengeScheme = Constants.FortnoxScheme;
             })

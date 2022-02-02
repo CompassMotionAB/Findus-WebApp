@@ -15,16 +15,16 @@ namespace FortnoxApiExample.Controllers
     {
         private readonly TokensContext _tokens;
         private readonly OAuth2Keys _auth2Keys;
-        public FortnoxAuthClient fortnoxAuthClient { get; private set; }
-        private FortnoxSettings _fortnoxSettings { get; set; }
-        public string _fortnoxState { get; private set; }
+        private readonly FortnoxSettings _fortnoxSettings;
+        public readonly FortnoxAuthClient FortnoxAuthClient;
+        public string FortnoxState { get; private set; }
 
         public ConnectController(TokensContext tokens, IOptions<OAuth2Keys> auth2Keys, IOptions<FortnoxSettings> fortnoxSettings)
         {
             _tokens = tokens;
             _auth2Keys = auth2Keys.Value;
             _fortnoxSettings = fortnoxSettings.Value;
-            fortnoxAuthClient = new FortnoxAuthClient();
+            FortnoxAuthClient = new FortnoxAuthClient();
         }
 
         public ActionResult Home()
@@ -64,13 +64,13 @@ namespace FortnoxApiExample.Controllers
                 // TODO: Skip login if user is already authenticated with correct scopeHash
                 // var scopeHash = scopes.GetUniqueHashForEnumerable() 
 
-                var authWorkflow = fortnoxAuthClient.StandardAuthWorkflow;
-                _fortnoxState = authWorkflow.GenerateState();
+                var authWorkflow = FortnoxAuthClient.StandardAuthWorkflow;
+                FortnoxState = authWorkflow.GenerateState();
 
                 // Store own returnUrl in state.
-                _fortnoxState = GenerateState(_fortnoxState, redirectUrl);
+                FortnoxState = GenerateState(FortnoxState, redirectUrl);
 
-                var authorizeUrl = authWorkflow.BuildAuthUri(_auth2Keys.ClientId, scopes, _fortnoxState, HttpContext.GenerateFullDomain() + _auth2Keys.CallbackPath);
+                var authorizeUrl = authWorkflow.BuildAuthUri(_auth2Keys.ClientId, scopes, FortnoxState, HttpContext.GenerateFullDomain() + _auth2Keys.CallbackPath);
 
                 return Redirect(authorizeUrl.AbsoluteUri);
             }
@@ -102,7 +102,7 @@ namespace FortnoxApiExample.Controllers
 
         private async Task GetAuthTokensAsync(string code)
         {
-            var authWorkflow = fortnoxAuthClient.StandardAuthWorkflow;
+            var authWorkflow = FortnoxAuthClient.StandardAuthWorkflow;
 
             var tokenResponse = await authWorkflow.GetTokenAsync(code, _auth2Keys.ClientId, _auth2Keys.ClientSecret);
             var token = _tokens.Token.FirstOrDefault();

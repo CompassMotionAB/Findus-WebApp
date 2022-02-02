@@ -5,7 +5,6 @@ using FortnoxApiExample.Services.Fortnox;
 using Fortnox.SDK.Entities;
 using System.Collections.Generic;
 
-
 namespace FortnoxApiExample.Controllers
 {
     public class FortnoxController : Controller

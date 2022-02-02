@@ -6,14 +6,30 @@ namespace FortnoxApiExample.Helper
 {
     public static class EnumerableExtensions
     {
-        public static String JoinToLower<T>(this IEnumerable<T> list, String delimiter)
+        /// <summary>
+        /// Joins an IEnumerable of T with optional delimiter.
+        /// </summary>
+        /// <remarks>
+        /// Delimiter will also be turned into lowercase
+		/// </remarks>
+		/// <param name="list">The IEnumerable<T> to join as lowercase.</param>
+		/// <returns>String of IEnumerable<T> with optional delimiter.</returns>
+        public static string JoinToLower<T>(this IEnumerable<T> list, string delimiter = null)
         {
-            StringBuilder sb = new StringBuilder();
-            foreach (T item in list)
+            using IEnumerator<T> iterator = list.GetEnumerator();
+            if (!iterator.MoveNext())
             {
-                sb.Append(item.ToString().ToLower());
+                return "";
             }
-            return sb.ToString();
+            StringBuilder sb = new StringBuilder();
+            sb.Append(iterator.Current);
+            while (iterator.MoveNext())
+            {
+                if (!String.IsNullOrEmpty(delimiter))
+                    sb.Append(delimiter);
+                sb.Append(iterator.Current);
+            }
+            return sb.ToString().ToLower();
         }
 
         /// <summary>
@@ -38,7 +54,7 @@ namespace FortnoxApiExample.Helper
                     // get hash code for all items in array
                     foreach (var item in array)
                     {
-                        hash = hash * 23 + item.GetHashCode();
+                        hash = (hash * 23) + item.GetHashCode();
                     }
 
                     return hash;
