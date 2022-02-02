@@ -81,93 +81,10 @@ namespace FortnoxApiExample.Security.Fortnox
 
                         return Task.FromResult(0);
                     },
-                    /*
-                    OnTicketReceived = context => {
-                        
-
-                        context.HandleResponse();
-
-                        if (string.IsNullOrEmpty(context.ReturnUri))
-                        {
-                            context.ReturnUri = "/";
-                        }
-
-                        context.Response.Redirect(context.ReturnUri);
-                        return Task.FromResult(0);
-                        
-                    },
-                    */
-                    /*
-                    OnCreatingTicket = async context =>
-                    {
-                        var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                        var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-                        response.EnsureSuccessStatusCode();
-
-                        var user = JObject.Parse(await response.Content.ReadAsStringAsync());
-
-                        // Add claims
-
-                        var userId = user.Value<string>("username");
-                        if (!string.IsNullOrEmpty(userId))
-                        {
-                            context.Identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, userId, ClaimValueTypes.String, context.Options.ClaimsIssuer));
-                            options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, userId);
-                        }
-
-                        var name = user.Value<string>("name");
-                        if (!string.IsNullOrEmpty(name))
-                        {
-                            context.Identity.AddClaim(new Claim(ClaimTypes.GivenName, name, ClaimValueTypes.String, context.Options.ClaimsIssuer));
-                            options.ClaimActions.MapJsonKey(ClaimTypes.GivenName, name);
-                        }
-
-                        var email = user.Value<string>("email");
-                        if (!string.IsNullOrEmpty(email))
-                        {
-                            context.Identity.AddClaim(new Claim(ClaimTypes.Email, email, ClaimValueTypes.Email, context.Options.ClaimsIssuer));
-                            options.ClaimActions.MapJsonKey(ClaimTypes.Email, email);
-                        }
-
-                        var avatar = user.Value<string>("avatar_url");
-                        if (!string.IsNullOrEmpty(avatar))
-                        {
-                            context.Identity.AddClaim(new Claim(ClaimTypes.Uri, avatar, ClaimValueTypes.String, context.Options.ClaimsIssuer));
-                            options.ClaimActions.MapJsonKey(ClaimTypes.Uri, avatar);
-                        }
-                    }*/
                 };
             });
 
             return serviceCollection;
-        }
-
-        public static AuthorizationOptions AddFortnoxAuthPolicy(this AuthorizationOptions options)
-        {
-
-            var scopes = _fortnoxSettings.Scopes;
-
-
-            var policy = new AuthorizationPolicyBuilder()
-                .AddAuthenticationSchemes(Constants.FortnoxScheme)
-                .RequireAuthenticatedUser();
-            scopes.ForEach(scope =>
-                options.AddPolicy(scope.ToString(),
-                    policy => policy.Requirements.Add(
-                        new ScopeRequirement(_fortnoxSettings.BaseUrl, scope.ToString())
-                    )
-                )
-            );
-            /*
-             options.AddPolicy(Constants.FortnoxAuthPolicy, policyBuilder => {
-                    policyBuilder.RequireClaim(ClaimTypes.Name);
-                });*/
-
-            options.AddPolicy(Constants.FortnoxAuthPolicy, policy.Build());
-            return options;
         }
     }
 }
