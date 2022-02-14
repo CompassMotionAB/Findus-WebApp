@@ -2,12 +2,15 @@
 using Fortnox.SDK;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using FortnoxApiExample.Helper;
+using FortnoxApiExample.Extensions;
 using FortnoxApiExample.Models;
 using FortnoxApiExample.Security.Fortnox;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
 using System.Linq;
+using FortnoxApiExample.Helper;
+using FortnoxApiExample.Extensions;
+using FortnoxApiExample.Helper;
 
 namespace FortnoxApiExample.Controllers
 {
@@ -42,7 +45,8 @@ namespace FortnoxApiExample.Controllers
             {
                 await GetAuthTokensAsync(code);
                 // Get own redirectUrl from state;
-                string[] stateParams = state.Split(";");
+
+                string[] stateParams = state.GetQueryParams();
                 if (stateParams.Length > 1)
                 {
                     var redirectUrl = stateParams[1];
@@ -54,23 +58,26 @@ namespace FortnoxApiExample.Controllers
             return RedirectToAction("Home", "Connect");
         }
 
-        [HttpGet]
         public IActionResult Login(string redirectUrl = null)
         {
             if (!string.IsNullOrEmpty(_auth2Keys.ClientId) && !string.IsNullOrEmpty(_auth2Keys.ClientSecret))
             {
                 var scopes = _fortnoxSettings.Scopes;
-                // TODO: Add User with correct Claims to Fortnox scopes
+                // TODO: Login/Add User with correct Claims to requsted Fortnox scopes
                 // TODO: Skip login if user is already authenticated with correct scopeHash
                 // var scopeHash = scopes.GetUniqueHashForEnumerable() 
 
                 var authWorkflow = FortnoxAuthClient.StandardAuthWorkflow;
+                var callbackPath = HttpContext.GenerateFullDomain() + _auth2Keys.CallbackPath;
+
                 FortnoxState = authWorkflow.GenerateState();
 
-                // Store own returnUrl in state.
-                FortnoxState = GenerateState(FortnoxState, redirectUrl);
+                if(!string.IsNullOrEmpty(redirectUrl)) {
+                    redirectUrl = callbackPath;
+                    FortnoxState.AppendQueryString(redirectUrl);
+                }
 
-                var authorizeUrl = authWorkflow.BuildAuthUri(_auth2Keys.ClientId, scopes, FortnoxState, HttpContext.GenerateFullDomain() + _auth2Keys.CallbackPath);
+                var authorizeUrl = authWorkflow.BuildAuthUri(_auth2Keys.ClientId, scopes, FortnoxState, callbackPath);
 
                 return Redirect(authorizeUrl.AbsoluteUri);
             }
@@ -89,15 +96,6 @@ namespace FortnoxApiExample.Controllers
                 return Redirect(redirectUrl);
             }
             return RedirectToAction("Index", "Home");
-        }
-        private string GenerateState(string state = null, string redirectUrl = null)
-        {
-            string stateOut = string.IsNullOrEmpty(state) ? System.Guid.NewGuid().ToString() : state;
-            if (!string.IsNullOrEmpty(redirectUrl))
-            {
-                stateOut += ";" + System.Web.HttpUtility.ParseQueryString(redirectUrl);
-            }
-            return stateOut;
         }
 
         private async Task GetAuthTokensAsync(string code)

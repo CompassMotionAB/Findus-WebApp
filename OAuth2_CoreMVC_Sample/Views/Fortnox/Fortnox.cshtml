@@ -1,35 +1,56 @@
-﻿@{
+﻿@using System.Collections.Generic;
+@using Fortnox.SDK.Entities;
+@{
+    var Customers = TempData["CustomerSubset"] as List<CustomerSubset>;
+    var CompanyName = ViewData["CompanyName"] as String;
 }
+<div class="mx-5">
+    @if (CompanyName != null)
+    {
+        <div class="mx-auto" style="max-width: 800px;">
+            <h1>@Html.Raw(CompanyName)</h1>
+        </div>
+        <br />
+    }
 
-@if(ViewData["FortnoxError"] != null) {
-    <div style="text-danger">@Html.Raw(ViewData["FortnoxError"])</div>
-}
-@if(ViewData["ErrorMessage"] != null) {
-    <br/>
-    <div style="text-danger">@Html.Raw(ViewData["ErrorMessage"])</div>
-}
+    @if (ViewData["FortnoxError"] != null)
+    {
+        <div style="text-danger">@Html.Raw(ViewData["FortnoxError"])</div>
+        <br />
+    }
+    @if (ViewData["ErrorMessage"] != null)
+    {
+        <div style="text-danger">@Html.Raw(ViewData["ErrorMessage"])</div>
+        <br />
+    }
 
-<a asp-controller="Fortnox" asp-action="CreateCustomer">
-    <div>
-        <input type="submit" name="customerBtn" value="Create Customer"/>
-    </div>
-</a>
-<br/>
-
-@if (ViewData["CustomerNr"] != null)
-{
-    @Html.Raw(ViewData["CustomerInfo"])
-    <br/>
-
-    <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerNr="@ViewData["CustomerNr"]">
+    <a asp-controller="Fortnox" asp-action="CreateCustomer">
         <div>
-            <input type="submit" name="invoiceBtn" value="Create Invoice"/>
+            <input type="submit" name="customerBtn" value="Create Customer" />
         </div>
     </a>
-}
-<br/>
+    <br />
 
-@if (ViewData["InvoiceInfo"] != null)
-{
-    @Html.Raw(ViewData["InvoiceInfo"])
-}
+    @if (ViewData["CustomerNr"] != null)
+    {
+        @Html.Raw(ViewData["CustomerInfo"])
+        <br />
+
+        <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerNr="@ViewData["CustomerNr"]">
+            <div>
+                <input type="submit" name="invoiceBtn" value="Create Invoice" />
+            </div>
+        </a>
+    }
+    <br />
+
+    @if (ViewData["InvoiceInfo"] != null)
+    {
+        @Html.Raw(ViewData["InvoiceInfo"])
+    }
+
+    @if (Customers != null)
+    {
+        @Html.Partial("Partial/CustomerOverview", Customers)
+    }
+</div>

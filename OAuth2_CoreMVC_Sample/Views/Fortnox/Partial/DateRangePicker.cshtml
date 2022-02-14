@@ -1,0 +1,33 @@
+@{
+    Layout = null;
+}
+<input type="text" class="text-box single-line" name="daterange" />
+
+<script type="text/javascript">
+    function updateDateParameters(dateFrom, dateTo) {
+        newHref = replaceQueryParam("dateFrom", dateFrom, location.href);
+        location.href = replaceQueryParam("dateTo", dateTo, newHref);
+    }
+    document.addEventListener("DOMContentLoaded", function () {
+        var params = getQueryParameters(location.href)
+
+        let dateRange = {
+            start: (params && params.dateFrom) ? moment(params.dateFrom) : moment().subtract(8, 'days'),
+            end: (params && params.dateTo) ? moment(params.dateTo) : moment().subtract(1, 'days'),
+        }
+        $('input[name="daterange"]').daterangepicker({
+            opens: 'left',
+            locale: {
+                format: "YYYY-MM-DD",
+                seperator: ' -> ',
+            },
+            seperator: ' -> ',
+            startDate: dateRange.start,
+            endDate: dateRange.end,
+        }, function (start, end, label) {
+            console.log("A new date selection was made: " + start.format('YYYY-MM-DD') + ' to ' + end.format('YYYY-MM-DD'));
+            updateDateParameters(start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
+        });
+    });
+
+</script>

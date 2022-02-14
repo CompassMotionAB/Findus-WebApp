@@ -3,34 +3,30 @@ using System.Threading.Tasks;
 using Fortnox.SDK;
 using Fortnox.SDK.Authorization;
 using Fortnox.SDK.Exceptions;
-using Fortnox.SDK.Search;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FortnoxApiExample.Models;
-using FortnoxApiExample.Security.Fortnox;
-using Fortnox.SDK.Interfaces;
 using FortnoxApiExample.Helper;
+using FortnoxApiExample.Extensions;
+using System.Collections.Generic;
+using Fortnox.SDK.Entities;
 
 namespace FortnoxApiExample.Services.Fortnox
 {
-    public class FortnoxContext : IActionFilter, IFortnoxServiceContext
+    public class FortnoxContext : IActionFilter, IFortnoxContext
     {
-        private readonly Token _token;
-        public ICompanyInformationConnector CompanyInformationConnector { get => Client.CompanyInformationConnector; }
-        public ICustomerConnector CustomerConnector { get => Client.CustomerConnector; }
-        public IInvoiceConnector InvoiceConnector { get => Client.InvoiceConnector; }
-        public FortnoxClient Client { get => GetFortnoxClient(); }
+        public FortnoxClient Client => GetFortnoxClient();
         public FortnoxClient GetFortnoxClient() => new FortnoxClient(new StandardAuth(GetAccessToken()));
-        public FortnoxContext()
-        {
-        }
+        private readonly Token _token;
+        public string CustomerNr;
+
+        public Dictionary<string, InvoiceSubset[]> CustomerInvoices;
 
         public FortnoxContext(Token token)
         {
             _token = token;
         }
-
         public string GetAccessToken()
         {
             return _token.AccessToken;
@@ -40,28 +36,22 @@ namespace FortnoxApiExample.Services.Fortnox
             return _token.RefreshToken;
         }
 
+        public void OnActionExecuting(ActionExecutingContext context) {
+            throw new NotImplementedException();
+        }
         public void OnActionExecuted(ActionExecutedContext context)
         {
             throw new NotImplementedException();
         }
-
-        public void OnActionExecuting(ActionExecutingContext context)
-        {
-            throw new NotImplementedException();
-        }
-
-
     }
     public class FortnoxServices : IFortnoxServices
     {
         private readonly TokensContext _tokens;
-        private readonly FortnoxSettings _fortnoxSettings;
         private readonly OAuth2Keys _auth2keys;
 
-        public FortnoxServices(TokensContext tokens, IOptions<FortnoxSettings> fortnoxSettings, IOptions<OAuth2Keys> auth2Keys)
+        public FortnoxServices(TokensContext tokens, IOptions<OAuth2Keys> auth2Keys)
         {
             _tokens = tokens;
-            _fortnoxSettings = fortnoxSettings.Value;
             _auth2keys = auth2Keys.Value;
         }
 
@@ -75,47 +65,55 @@ namespace FortnoxApiExample.Services.Fortnox
 
             if (token == null || token.AccessToken == null)
             {
-                throw new Exception("Fortnox Api not Connected.");
+                throw new FortnoxApiException("Fortnox Api not Connected");
             }
-
-
             try
             {
                 var context = new FortnoxContext(token);
                 apiCallFunction(context);
+                _tokens.SaveChanges();
             }
-            catch (FortnoxApiException ex)
+            catch (Exception ex)
             {
-                if (ex.ResponseContent == "{\"message\":\"unauthorized\"}")
+                // TODO: Informative message if user is not authorized to scope.
+                // TODO: use Authorization Policy middleware
+                if ((ex.InnerException as FortnoxApiException)?.ResponseContent == "{\"message\":\"unauthorized\"}")
                 {
-                    var fortnoxAuthClient = new FortnoxAuthClient();
-                    var authWorkflow = fortnoxAuthClient.StandardAuthWorkflow;
-                    var tokens = await authWorkflow.RefreshTokenAsync(token.RefreshToken, _auth2keys.ClientId, _auth2keys.ClientSecret);
-                    if (tokens.AccessToken != null && tokens.RefreshToken != null)
-                    {
-                        await UpdateTokens(tokens.AccessToken, tokens.RefreshToken);
-                        // TODO: Possible infinite loop
-                        await FortnoxApiCall(apiCallFunction);
-                    }
+                    await RefreshTokens(apiCallFunction);
                 }
                 else
                 {
-                    // TODO: What to do? For now, assumes faulty token and removes it ( should replace with logout fnc )
+                    // TODO: For now, assumes faulty token and removes it
                     _tokens.Token.RemoveRange(_tokens.Token);
                     await _tokens.SaveChangesAsync();
                     throw new Exception(message: ex.Message);
                 }
             }
         }
+        public async Task RefreshTokens(Action<FortnoxContext> apiCallFunction)
+        {
+            var token = await _tokens.Token.FirstOrDefaultAsync();
+            var fortnoxAuthClient = new FortnoxAuthClient();
+            var authWorkflow = fortnoxAuthClient.StandardAuthWorkflow;
+            var newToken = await authWorkflow.RefreshTokenAsync(token.RefreshToken, _auth2keys.ClientId, _auth2keys.ClientSecret);
+            if (newToken.AccessToken != null && newToken.RefreshToken != null)
+            {
+                await UpdateToken(newToken);
+                await FortnoxApiCall(apiCallFunction);
+            }
+        }
 
+        private Task<Token> UpdateToken(global::Fortnox.SDK.Auth.TokenInfo newToken)
+        {
+            return UpdateToken(newToken.AccessToken, newToken.RefreshToken);
+        }
 
-        public async Task<Token> UpdateTokens(string newAccessToken, string newRefreshToken)
+        public async Task<Token> UpdateToken(string newAccessToken, string newRefreshToken)
         {
             var token = await _tokens.Token.FirstOrDefaultAsync();
             if (token != null)
             {
-                token.AccessToken = newAccessToken;
-                token.RefreshToken = newRefreshToken;
+                token.UpdateToken(newAccessToken, newRefreshToken);
                 _tokens.SaveChanges();
             }
 

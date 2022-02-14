@@ -1,0 +1,85 @@
+@using Fortnox.SDK.Entities;
+@model IEnumerable<CustomerSubset>
+
+@{
+    Layout = null;
+    var Invoices = TempData["InvoiceSubset"] as InvoiceSubset[];
+    bool CustomerPage = Invoices != null;
+}
+<div class="form-group">
+    <div class="center-block">
+        @Html.Partial("Partial/DateRangePicker")
+    </div>
+    <table cellpadding="0" cellspacing="0" class="Grid">
+        <tr>
+            <th></th>
+            <th>Customer Nr.</th>
+            <th>Contact Name</th>
+            <th>City</th>
+        </tr>
+        @foreach (CustomerSubset customer in Model)
+        {
+            <tr>
+                <td>
+                    @if (!CustomerPage)
+                    {
+                        <img src="~/images/plus.png" id="@customer.CustomerNumber" />
+                    }
+                    <div style="display:none">
+                        <table cellpadding="0" cellspacing="0" class="ChildGrid">
+                            <tr>
+                                <th>OrderID</th>
+                                <th>OrderDate</th>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+                <td>
+                    @if (!CustomerPage)
+                    {
+                        <a
+                    href='@Url.Action("Customer", "Fortnox", new { customerNr = @customer.CustomerNumber })'>@customer.CustomerNumber</a>
+                    }
+                    else
+                    {
+                        @customer.CustomerNumber
+                    }
+                </td>
+                <td>@customer.Name</td>
+                <td>@customer.City</td>
+            </tr>
+            @if (Invoices != null)
+            {
+                Html.Partial("Partial/InvoiceSubsetList", Invoices);
+            }
+        }
+    </table>
+</div>
+
+<script type="text/javascript">
+    function createCustomerLink(actionUrl, customerNr, customerName = null) {
+        return `<a href=${actionUrl + '?customerNr=' + customerNr}>${customerName ? customerName : customerNr}</a>`
+    }
+    function createInvoiceLink(actionUrl, documentNr, linkName = null) {
+        return `<a href=${actionUrl + '?documentNr=' + documentNr}>${linkName ? linkName : documentNr}</a>`
+    }
+    document.addEventListener("DOMContentLoaded", function () {
+        $("body").on("click", "img[src*='plus.png']", function () {
+            var customerNr = $(this).attr("id");
+            var btn = $(this);
+            $.get("@Url.Action("CustomerInvoices", "Fortnox")" + "?customerNr=" + customerNr, function (data) {
+                if (data !== undefined || data !== "") {
+                    console.log(data);
+                    btn.closest("tr").after("<tr><td></td><td colspan = '999'>" + data + "</td></tr>");
+                } else {
+                    btn.closest("tr").after("<tr><td></td><td colspan = '999'>No data</td></tr>");
+                }
+            });
+            $(this).attr("src", "/images/minus.png");
+        });
+        $("body").on("click", "img[src*='minus.png']", function () {
+            $(this).attr("src", "/images/plus.png");
+            $(this).closest("tr").next().remove();
+        });
+    });
+</script>

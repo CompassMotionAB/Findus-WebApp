@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FortnoxApiExample.Helper
+namespace FortnoxApiExample.Extensions
 {
     public static class EnumerableExtensions
     {

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace FortnoxApiExample.Services.Fortnox
 {
-    public interface IFortnoxServiceContext
+    public interface IFortnoxContext 
     {
         string GetAccessToken();
         string GetRefreshToken();
@@ -15,5 +15,6 @@ namespace FortnoxApiExample.Services.Fortnox
     public interface IFortnoxServices
     {
         Task FortnoxApiCall(Action<FortnoxContext> apiCallFunction);
+        Task RefreshTokens(Action<FortnoxContext> apiCallFunction);
     }
 }

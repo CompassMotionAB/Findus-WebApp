@@ -1,0 +1,22 @@
+@model IEnumerable<Fortnox.SDK.Entities.CustomerSubset>
+@{
+    Layout = null;
+}
+@if(Model != null) {
+<table id="customerTable" cellpadding="0" cellspacing="0">
+    <tr>
+        <th></th>
+        <th>CustomerNumber</th>
+        <th>City</th>
+    </tr>
+    @foreach (var customer in Model)
+    {
+        <tr>
+            <td>@customer.CustomerNumber</td>
+            <td>@customer.City</td>
+        </tr>
+    }
+</table>
+} else {
+    <div class="text-danger">Failed to fetch customer invoices</div>
+}

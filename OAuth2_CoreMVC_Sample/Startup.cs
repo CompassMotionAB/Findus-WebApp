@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.AspNetCore.Session;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ using FortnoxApiExample.Models;
 using FortnoxApiExample.Services.Fortnox;
 using Microsoft.IdentityModel.Logging;
 using FortnoxApiExample.Security.Fortnox;
+using System;
 
 namespace FortnoxApiExample
 {
@@ -36,10 +38,23 @@ namespace FortnoxApiExample
 
             IdentityModelEventSource.ShowPII = true;
 
+            // <!--- Session
+            services.AddDistributedMemoryCache();
+
+            services.AddSession(options =>
+            {
+                // Set a short timeout for easy testing.
+                options.IdleTimeout = TimeSpan.FromSeconds(10);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
+            // ---!>
+
             services.Configure<FortnoxSettings>(Configuration.GetSection(FortnoxSettings.Name));
             services.AddSingleton<FortnoxSettings>();
             services.Configure<OAuth2Keys>(Configuration.GetSection(OAuth2Keys.Name));
 
+            services.AddHttpClient();
             services.AddHttpContextAccessor();
 
             services.AddFortnoxAuthorization(Configuration);
@@ -48,7 +63,7 @@ namespace FortnoxApiExample
 
             services.AddTransient<IFortnoxServices, FortnoxServices>();
 
-            services.AddSingleton(provider => Configuration);
+            services.AddSingleton(_ => Configuration);
 
             services.AddControllersWithViews();
         }
@@ -69,6 +84,9 @@ namespace FortnoxApiExample
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+            //app.UseCookiePolicy();
+
+            //app.UseSession();
 
             app.UseRouting();
 

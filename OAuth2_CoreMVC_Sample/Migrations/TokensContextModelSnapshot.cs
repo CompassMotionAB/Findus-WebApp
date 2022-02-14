@@ -13,7 +13,7 @@ namespace FortnoxApiExample.Migrations
             modelBuilder
                 .HasAnnotation("ProductVersion", "2.2.4-servicing-10062");
 
-            modelBuilder.Entity("OAuth2_CoreMVC_Sample.Models.Token", b =>
+            modelBuilder.Entity("FortnoxApiExample.Models.Token", b =>
             {
                 b.Property<string>("RealmId")
                     .HasColumnType("TEXT")
