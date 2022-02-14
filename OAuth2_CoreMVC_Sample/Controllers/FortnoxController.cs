@@ -93,7 +93,7 @@ namespace FortnoxApiExample.Controllers
             TempData["InvoiceSubset"] = context.Client.InvoiceConnector.GetInvoices(customerNr).Result;
         }
 
-        private async Task FetchAsync<TEntitySubset>(string customerNr = null)
+        private async Task FetchAsync<TEntitySubset>(string customerNr)
         {
             string entityName = typeof(TEntitySubset)?.Name;
 
@@ -124,10 +124,10 @@ namespace FortnoxApiExample.Controllers
         private async void GetCustomersPage(FortnoxContext context)
         {
             TempData["CacheKey"] = "CustomerPage";
-            var customerNr = TempData["CustomerNr"] as string;
+            var customerNr = TempData.Peek("CustomerNr") as string;
             await FetchAsync<CustomerSubset>(customerNr);
             if(!string.IsNullOrEmpty(customerNr))
-                await FetchAsync<InvoiceSubset>();
+                await FetchAsync<InvoiceSubset>(customerNr);
             TempData.Remove("CacheKey");
         }
         public async Task<IActionResult> Customer(string customerNr = null)
