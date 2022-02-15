@@ -19,9 +19,7 @@ namespace FindusWebApp.Controllers
     public class FortnoxController : Controller
     {
         private readonly IFortnoxServices _services;
-        private readonly Dictionary<string, InvoiceSubset[]> _customerInvoices;
         private readonly IMemoryCache _memoryCache;
-        private readonly string _sessionKey = "Session";
         private readonly IHttpClientFactory _httpClientFactory;
 
         public FortnoxController(IFortnoxServices services, IMemoryCache memoryCache, IHttpClientFactory httpClientFactory)

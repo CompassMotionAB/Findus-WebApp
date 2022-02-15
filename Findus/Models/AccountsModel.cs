@@ -21,14 +21,13 @@ namespace Findus.Models
     public class AccountModel
     {
         [JsonProperty("standard", Required = Required.DisallowNull)]
-        public RateModel? Standard { get; set; }
+        public RateModel Standard { get; set; }
         [JsonProperty("reduced", Required = Required.DisallowNull)]
-        public RateModel? Reduced { get; set; }
+        public RateModel Reduced { get; set; }
     }
 
     public class AccountsModel
     {
-
         public AccountsModel(Dictionary<string, AccountModel> vat, Dictionary<string, AccountModel> sales)
         {
             VAT = vat;

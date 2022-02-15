@@ -9,8 +9,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
 using System.Linq;
 using FindusWebApp.Helper;
-using FindusWebApp.Extensions;
-using FindusWebApp.Helper;
 
 namespace FindusWebApp.Controllers
 {
