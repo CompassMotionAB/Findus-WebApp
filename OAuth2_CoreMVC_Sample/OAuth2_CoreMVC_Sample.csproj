@@ -6,12 +6,22 @@
 
   <ItemGroup>
     <None Include="wwwroot\images\C2FNK_white_btn_lg_default.png" />
+    <None Update="SalesAccounts.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="VATAccounts.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   
   <ItemGroup>
     <PackageReference Include="Fortnox.NET.SDK" Version="4.3.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="..\Findus\Findus.csproj" />
   </ItemGroup>
   
 </Project>

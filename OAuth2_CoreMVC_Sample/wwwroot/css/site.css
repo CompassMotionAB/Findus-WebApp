@@ -70,7 +70,8 @@ body[data-theme="dark"] {
   color: var(--clr-text);
 
   position: absolute;
-  top: var(--mg);
+  /* top: var(--mg); */
+  top: auto;
   right: var(--mg);
   border-radius: 5px;
   max-width: 150px;
@@ -180,4 +181,19 @@ th {
 td {
   padding: 5px;
   border: 1px solid;
+}
+
+.vertical-divider {
+  border-left: 2px solid darkgray;
+  border-right: 1px solid lightgray;
+  height: 100%;
+  position: absolute;
+  left: 52%;
+}
+
+.horizontal-divider {
+  border-top: 2px solid darkgray;
+  border-bottom: 1px solid lightgray;
+  width: 100%;
+  display: inline-block;
 }
