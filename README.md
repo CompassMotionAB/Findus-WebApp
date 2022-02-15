@@ -1,4 +1,4 @@
-# OAuth2_DotnetCore_MVC5_SampleApp
+# Findus Web App MVC5
 DotNet Core MVC5 Sample app using .NET Standard SDK
 
 This example of using Fortnox API with OAuth 2.0 Authentication in .Net Core(C#) MVC5 was adapted from Intuit Sample App of their integration which can be found [here](https://github.com/IntuitDeveloper/OAuth2_DotnetCore_MVC5_SampleApp).
@@ -9,7 +9,7 @@ You should have a functional App in your Developer portal with Client-Id and Cli
 
 ## PreRequisites
 
-1. Visual Studio 2019 or above
+1. Visual Studio 2019 or above, Visual Studio Code
 2. Microsoft.Net.Compilers 2.10.0
 3. .Net Core 3.1
 
