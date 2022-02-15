@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/OAuth2_CoreMVC_Sample/OAuth2_CoreMVC_Sample.csproj",
+                "${workspaceFolder}/FindusWebApp/FindusWebApp.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/OAuth2_CoreMVC_Sample/OAuth2_CoreMVC_Sample.csproj",
+                "${workspaceFolder}/FindusWebApp/FindusWebApp.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/OAuth2_CoreMVC_Sample/OAuth2_CoreMVC_Sample.csproj"
+                "${workspaceFolder}/FindusWebApp/FindusWebApp.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
