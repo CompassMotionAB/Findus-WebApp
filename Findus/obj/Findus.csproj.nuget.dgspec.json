@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/jq/fortnox-api-example-mvc5/Findus/Findus.csproj": {}
+  },
+  "projects": {
+    "/home/jq/fortnox-api-example-mvc5/Findus/Findus.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/jq/fortnox-api-example-mvc5/Findus/Findus.csproj",
+        "projectName": "Findus",
+        "projectPath": "/home/jq/fortnox-api-example-mvc5/Findus/Findus.csproj",
+        "packagesPath": "/home/jq/.nuget/packages/",
+        "outputPath": "/home/jq/fortnox-api-example-mvc5/Findus/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/jq/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netcoreapp3.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "netcoreapp3.1": {
+            "targetAlias": "netcoreapp3.1",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "netcoreapp3.1": {
+          "targetAlias": "netcoreapp3.1",
+          "dependencies": {
+            "Fortnox.NET.SDK": {
+              "target": "Package",
+              "version": "[4.3.0, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.1, )"
+            },
+            "WooCommerceNET": {
+              "target": "Package",
+              "version": "[0.8.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[3.1.10, 3.1.10]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/6.0.101/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
