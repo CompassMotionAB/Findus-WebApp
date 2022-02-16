@@ -114,10 +114,10 @@ namespace Findus.Helpers
             var countryIso = order.billing.country;
 
             bool isInEu = VerificationUtils.IsInsideEU(countryIso);
-            bool orderStandard = VerificationUtils.OnlyStandardRate(order.line_items);
-            bool orderReduced = !orderStandard;
+            bool isStandard = VerificationUtils.OnlyStandardRate(order.line_items);
+            bool isReduced = !isStandard;
             bool hasFreeShaker = false;
-            bool hasShipping = order.shipping_lines.Count > 0;
+            bool hasShippingCost = order.shipping_lines.Count > 0 && order.shipping_total > 0;
 
             if (order.fee_lines != null && order.fee_lines.Count != 0)
                 throw new Exception("WooCommerce order contains unexpected 'fee_lines'");
@@ -135,12 +135,13 @@ namespace Findus.Helpers
                 {
                     "freeshaker" => true,
                     "blackcherry" => throw new NotImplementedException(),
-                    _ => throw new Exception("WooCommerce order contains unexpected 'discount' in 'coupon_lines'"),
+                    _ => throw new Exception($"WooCommerce order contains unexpected discount code: {discount.code}"),
                 };
             }
 
             // Most accurate total:
             decimal total = (decimal)order.line_items.Sum(i => (i.price + i.subtotal_tax) * i.quantity);
+            //total -= (decimal)order.cart_tax;
             decimal totalShip = (decimal)order.shipping_total;
             decimal totalShipVat = (decimal)order.shipping_tax;
 
@@ -151,41 +152,48 @@ namespace Findus.Helpers
                 // (!) NOTE: Assumes the price of shaker is 18 EUR
                 total -= (decimal)order.line_items.Sum(i => i.sku == "NAU007" ? i.quantity * 18.0M : 0.0M);
             }
-            // Should not deviate more than 0.01 from WooCommerce total
+            // Should not deviate more than 0.01 from WooCommerce total cost
             if (diff > 0.01)
             {
                 throw new Exception(
-                    String.Format("WooCommerce order total does not match calculated total. Difference({0}, {1}) = {2}{3}",
-                    total,
-                    order.total,
-                    diff.ToString("0.000"),
-                     hasFreeShaker ? " NOTE: Order contains free shaker(s), SKU: NAU007." : null)
+                    string.Format("WooCommerce order total does not match calculated total. Difference: {0}, {1} = {2:0.000}{3}",
+                        total,
+                        order.total,
+                        diff,
+                        hasFreeShaker ? " NOTE: Order contains free shaker(s), SKU: NAU007." : null
+                    )
                 );
             }
             decimal shippingSEK = totalShip * currencyRate;
             decimal shippingVatSEK = totalShipVat * currencyRate;
             decimal totalSEK = total * currencyRate;
 
-            var paymentMethod = VerificationUtils.GetPaymentMethod(order);
+            var paymentMethod = GetPaymentMethod(order);
 
             var inv = new InvoiceAccrual();
 
             if (isInEu)
             {
-                var salesAccNr = accounts.GetSales(paymentMethod, orderStandard).AccountNr;
-                inv.AddRow(salesAccNr, debit: totalSEK + shippingSEK);
+                var salesAccNr = accounts.GetSales(paymentMethod, isStandard).AccountNr;
+                inv.AddRow(
+                    salesAccNr,
+                    debit: totalSEK + shippingSEK,
+                    info: paymentMethod
+                );
 
-                if (hasShipping)
+                if (hasShippingCost)
                 {
-                    var vatAcc = accounts.GetVAT(paymentMethod, orderStandard);
+                    var vatAcc = accounts.GetVAT(paymentMethod, isStandard);
                     var vatAccNr = vatAcc.AccountNr;
                     inv.AddRow(
                         vatAccNr,
-                        credit: (decimal)(order.shipping_total - order.shipping_tax) * currencyRate
+                        credit: (decimal)(order.shipping_total - order.shipping_tax) * currencyRate,
+                        info: "Fraktkostnad"
                     );
                     inv.AddRow(
                         vatAccNr,
-                        credit: (decimal)order.shipping_tax * currencyRate
+                        credit: (decimal)order.shipping_tax * currencyRate,
+                        info: $"Fraktkostnad VAT {vatAcc.Rate:P2}"
                     );
                 }
                 foreach (var item in order.line_items)
@@ -194,32 +202,39 @@ namespace Findus.Helpers
                     if (item.tax_class == "reduced-rate")
                     {
                         var acc = SalesAccount.Reduced;
+                        VerifyRate(acc, order, item);
+
                         inv.AddRow(
                                 acc.AccountNr,
-                                credit: (decimal)(item.price * item.quantity) * currencyRate// * (decimal)acc.Rate
+                                credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
+                                info: $"Försäljning - {acc.Rate:P2}"
                             );
                         if (item.subtotal_tax > 0.0M)
                         {
                             acc = VATAccount.Reduced;
                             inv.AddRow(
                                 acc.AccountNr,
-                                credit: (decimal)(item.subtotal_tax) * currencyRate// * (decimal)acc.Rate
+                                credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
+                                info: $"Utgående Moms - {acc.Rate:P2}"
                         );
                         }
                     }
                     else
                     {
                         var acc = SalesAccount.Standard;
+                        VerifyRate(acc, order, item);
                         inv.AddRow(
                             acc.AccountNr,
-                            credit: (decimal)(item.price * item.quantity) * currencyRate// * (decimal)acc.Rate
+                            credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
+                            info: $"Försäljning - {acc.Rate:P2}"
                     );
                         if (item.subtotal_tax > 0.0M)
                         {
                             acc = VATAccount.Standard;
                             inv.AddRow(
                                 acc.AccountNr,
-                                credit: (decimal)(item.subtotal_tax) * currencyRate// * (decimal)acc.Rate
+                                credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
+                                info: $"Utgående Moms - {acc.Rate:P2}"
                         );
                         }
                     }
@@ -237,23 +252,40 @@ namespace Findus.Helpers
                 // If country is outside EU and Rate is 0%, use AccountNr: 3105 ( defined in SalesAccount["NON_EU"])
                 inv.AddRow(
                                 salesAcc.AccountNr,
-                                debit: totalSEK + shippingSEK
+                                debit: totalSEK + shippingSEK,
+                                info: paymentMethod
                         );
                 inv.AddRow(
                                 vatAcc.AccountNr,
-                                credit: totalSEK
+                                credit: totalSEK,
+                                info: $"Utanför EU - Moms - {0.0:P2}"
                         );
-                if (hasShipping && totalShip > 0.0M)
+                if (hasShippingCost)
                 {
-                    if (orderReduced) vatAcc = accounts.GetVATAccount(paymentMethod).Reduced;
+                    if (isReduced) vatAcc = accounts.GetVATAccount(paymentMethod).Reduced;
                     inv.AddRow(
                             vatAcc.AccountNr,
-                            credit: shippingSEK
+                            credit: shippingSEK,
+                            info: "Fraktkostnad"
                     );
                 }
             }
 
             return inv;
+        }
+
+        private static void VerifyRate(RateModel acc, WcOrder order, OrderLineItem item)
+        {
+            string taxLabel = order.tax_lines[
+                item.tax_class == "reduced-rate"
+                ? 0
+                : 1].label;
+
+            decimal wcTax = decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
+            if (acc.Rate != wcTax)
+            {
+                throw new Exception($"VAT Rate miss-match, expected value: {acc.Rate:P2} VAT, but WooCommerce gave: {taxLabel}");
+            }
         }
     }
 }

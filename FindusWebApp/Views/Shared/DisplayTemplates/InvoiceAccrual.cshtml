@@ -1,0 +1,20 @@
+@model Fortnox.SDK.Entities.InvoiceAccrual
+
+@{
+    Layout = null;
+}
+
+<div class="form-group">
+    <table style="width: 100%; margin: auto;">
+        <tr>
+            <th style="min-width: 250px;"></th>
+            <th style="min-width: 30px;">Konto</th>
+            <th style="min-width: 30px;">Debet (SEK)</th>
+            <th style="min-width: 30px;">Kredit (SEK)</th>
+        </tr>
+        @foreach (var invoiceRow in Model.InvoiceAccrualRows)
+        {
+            @Html.DisplayFor(m => invoiceRow)
+        }
+    </table>
+</div>

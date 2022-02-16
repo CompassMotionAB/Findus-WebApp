@@ -1,8 +1,12 @@
+@model FindusWebApp.Models.OrderViewModel
 @{
-    var Order = TempData["order"] as WooCommerceNET.WooCommerce.v2.Order;
+    //var Order = TempData["order"] as WooCommerceNET.WooCommerce.v2.Order;
     var Invoice = TempData["invoice"] as Fortnox.SDK.Entities.Invoice;
     var InvoiceAccrual = TempData["invoiceAccrual"] as Fortnox.SDK.Entities.InvoiceAccrual;
+
+    var Order = @Model.Order;
 }
+
 @if (ViewBag.Error != null)
 {
     <p style="font-weight:normal;color:red">
@@ -20,7 +24,12 @@
 
 <div style="width:50%; float: left;">
     <h1>WooCommerce</h1>
-    @Html.DisplayFor(m=> @Order)
+    @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block",
+    @onchange="changeOrder(this)" })
+
+    @if(@Order != null) {
+        @Html.DisplayFor(m=> @Order)
+    }
 </div>
 
 <div style="float:right;width: 45%;">
@@ -29,8 +38,25 @@
 
     <div>
         <h1>Fortnox</h1>
-        @Html.DisplayFor(m => @Invoice)
+        @if (@Invoice != null) {
+            @Html.DisplayFor(m => @Invoice)
+        }
+        @if (@InvoiceAccrual != null) {
+            @Html.DisplayFor(m => @InvoiceAccrual)
+        }
     </div>
 </div>
 
 <div style="clear:both"></div>
+
+<script>
+    function changeOrder(e) {
+        location.href = replaceQueryParam("orderId", e.selectedOptions[0].value, location.href);
+    }
+document.addEventListener('DOMContentLoaded', function () {
+        var orderId = document.getElementById('Orders').value;
+        if (location.href.indexOf('orderId=' + orderId) == -1) {
+            location.href = replaceQueryParam("orderId", orderId, location.href);
+        }
+    }, false);
+</script>

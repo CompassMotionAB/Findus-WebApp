@@ -32,6 +32,7 @@
         <td>@Model.payment_method_title (@Model.payment_method)</td>
     </tr>
 </table>
+
     <br />
     <table>
     <col>
@@ -51,12 +52,11 @@
         <th scope="col">Total</th>
 
         <th scope="col">Cart Tax</th>
-        <th scope="col">Tax</th>
+        <th scope="col">Total Tax</th>
         <th scope="col">Total</th>
 
     </tr>
     <tr>
-        <td>@Model.cart_tax</td>
 
         <td>@Model.discount_tax</td>
         <td>@Model.discount_total</td>
@@ -64,10 +64,32 @@
         <td>@Model.shipping_tax</td>
         <td>@Model.shipping_total</td>
 
+        <td>@Model.cart_tax</td>
         <td>@Model.total_tax</td>
         <td>@Model.total</td>
     </tr>
+
 </table>
+    <br />
+    if (@Model.coupon_lines.Count != 0)
+    {
+        <h3>Coupons</h3>
+        <table>
+    <tr>
+        <th>Code</th>
+        <th>Discount Tax</th>
+        <th>Discount Total</th>
+    </tr>
+    <tr>
+        @foreach (var coupon in @Model.coupon_lines)
+                {
+                    <td>@coupon.code</td>
+                    <td>@coupon.discount_tax</td>
+                    <td>@coupon.discount</td>
+                }
+            </tr>
+        </table>
+    }
     <br />
     <h2>Items</h2>
     <table>

@@ -1,0 +1,38 @@
+@model Fortnox.SDK.Entities.InvoiceAccrualRow
+
+@{
+    Layout = null;
+}
+<tr>
+    
+    @* <td>
+        <input class="text-box single-line" type="hidden" id="@(Model.Id)__Id" class="iHidden" value="@(Model.Id)" />
+        <span class="single-line" style="width: 100%;">
+            @if (@Model.Account != null)
+            {
+                @Html.Raw(@Model.Account)
+            }
+        </span>
+    </td> *@
+    <td>
+        <span class="single-line" style="width: 100%;">
+            @Html.Raw(@Model.TransactionInformation)
+        </span>
+    </td>
+    <td>
+        <input class="text-box single-line" style="width: 100%;" type='text' value="@(Model.Account)" />
+    </td>
+    <td>
+        <input class="text-box single-line" style="width: 100%;" type='text' autocomplete="off"
+            value=@($"{this.Model.Debit:0.##}") />
+    </td>
+    <td>
+        <input class="text-box single-line" style="width: 100%;" type='text' autocomplete="off"
+            value=@($"{this.Model.Credit:0.##}") />
+    </td>
+    @* <td>
+        <input type='checkbox' value='true' id='Interests_@(Model.Id)__IsExperienced'
+        name='Interests[@Model.Id].IsExperienced'
+        />
+        </td> *@
+</tr>

@@ -13,14 +13,6 @@ namespace Findus.Helpers
             if (string.IsNullOrEmpty(json)) throw new ArgumentException($"Failed to parse json file {jsonFilePath}");
             return JsonConvert.DeserializeObject<T>(json, jsonSettings);
         }
-        public static string DateString(DateTime dateTime)
-        {
-            return String.Format("{0:yyyy-MM-ddTHH:mm:ss}", dateTime);
-        }
-        public static string DateString(string dateString)
-        {
-            var tmpDate = DateTime.Parse(dateString);
-            return DateString(tmpDate);
-        }
+        
     }
 }
