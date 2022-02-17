@@ -18,7 +18,7 @@ namespace FindusWebApp.Models
             }
             catch (Exception)
             {
-                return String.Format("Missing English Name: {0}", countryCode);
+                return $"Missing English Name: {countryCode}";
             }
         }
 
@@ -26,7 +26,7 @@ namespace FindusWebApp.Models
         {
             get
             {
-                return new SelectList((from o in Orders.OrderByDescending(
+                return new SelectList(from o in Orders.OrderByDescending(
                                        //NOTE: Sort by date paid/completed
                                        x => x.Value.date_paid ?? x.Value.date_completed)
                                        select new
@@ -35,20 +35,16 @@ namespace FindusWebApp.Models
                                            Value = String.Format("{0} - {1} - {2}",
                                            o.Value.id,
                                            String.Format(
-                                               "{0:yyyy/M/d hh:mm}",
+                                               "{0:yyyy-MM-dd H:mm}",
                                                 o.Value.date_paid ?? o.Value.date_created
                                            ),
-
                                            GetEnglishName(o.Value.shipping.country)
                                            ),
-                                       }), "id", "Value", CurrentId);
-
+                                       }, "id", "Value", CurrentId);
             }
         }
 
-
         public ulong? CurrentId { get; set; }
-
         public Dictionary<ulong?, WcOrder> Orders;
         public WcOrder Order
         {
