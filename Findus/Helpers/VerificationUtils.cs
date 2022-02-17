@@ -304,12 +304,25 @@ namespace Findus.Helpers
                 }
             }
 
-            if(paymentMethod == "Stripe") {
-                decimal stripeFee = decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_fee").value);
-                inv.AddRow(1580, credit: stripeFee, info: "Stripe Avgift");
-                inv.AddRow(6570, debit: stripeFee, info: "Stripe Avgift");
+            return inv.AddPaymentFee(order, SalesAccount, paymentMethod);
+        }
+
+        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, WcOrder order, AccountModel salesAccount, string paymentMethod = null)
+        {
+            if (string.IsNullOrEmpty(paymentMethod))
+            {
+                paymentMethod = GetPaymentMethod(order);
             }
-            return inv;
+            decimal fee = paymentMethod switch {
+                "Stripe" => decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_fee").value),
+                "PayPal" => throw new NotImplementedException(),
+                _ => 0.0M
+            };
+            if(fee > 0.0M) {
+                invoice.AddRow(salesAccount.Standard.AccountNr, credit: fee, info: $"{paymentMethod} Avgift");
+                invoice.AddRow(6570, debit: fee, info: $"{paymentMethod} Avgift");
+            }
+            return invoice;
         }
 
         private static string VerifyRate(RateModel acc, WcOrder order, OrderLineItem item)
