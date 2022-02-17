@@ -1,4 +1,10 @@
 @model WooCommerceNET.WooCommerce.v2.Order
+@{
+    var StripeFee = ViewData["stripeFee"] as decimal?;
+    var StripeNet = ViewData["stripeNet"] as decimal?;
+    var TotalSek = ViewData["totalSek"] as decimal?;
+    var CurrencyRate = ViewData["currencyRate"] as decimal?;
+}
 <style>
     table {
         width: 100%;
@@ -32,8 +38,30 @@
         <td>@Model.payment_method_title (@Model.payment_method)</td>
     </tr>
 </table>
+    @if (StripeFee != null && StripeNet != null)
+    {
+        <br/>
+        <h3>Stripe</h3>
+        <table>
+    <tr>
+        <th>Belopp</th>
+        <th>Växelkurs</th>
+        <th>Avgift</th>
+        <th>Netto</th>
+    </tr>
+    <tr>
+        <td>@Model.total EUR -> @($"{TotalSek:0.##} kr")</td>
+        <td> 1.0 EUR -> @($"{CurrencyRate:0.######} kr")</td>
+        <td>@($"{StripeFee:0.##} kr")</td>
+        <td>@StripeNet kr</td>
+    </tr>
+</table>
+    }
+    <table>
+</table>
 
     <br />
+    <h3>Cost Summary</h3>
     <table>
     <col>
     <col>
@@ -70,28 +98,24 @@
     </tr>
 
 </table>
-    <br />
     if (@Model.coupon_lines.Count != 0)
     {
+        <br />
         <h3>Coupons</h3>
         <table>
     <tr>
         <th>Code</th>
-        <th>Discount Tax</th>
-        <th>Discount Total</th>
     </tr>
     <tr>
         @foreach (var coupon in @Model.coupon_lines)
                 {
                     <td>@coupon.code</td>
-                    <td>@coupon.discount_tax</td>
-                    <td>@coupon.discount</td>
                 }
             </tr>
         </table>
     }
     <br />
-    <h2>Items</h2>
+    <h3>Items</h3>
     <table>
     @* <tr>
         <td>Total Tax</td>
@@ -107,7 +131,7 @@
         <th>Quantity</th>
         <th>Total Cost</th>
     </tr>
-    @foreach (var product in @Model.line_items)
+    @foreach (var product in @Model.line_items.OrderByDescending(i => i.price))
         {
             <tr>
                 <td>@product.sku</td>

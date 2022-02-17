@@ -90,20 +90,78 @@ namespace Findus.Helpers
             if (order.date_paid == null) throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1) throw new Exception($"Order Id: {order.id} is missing items in order");
 
+            var invoiceRows = new List<InvoiceRow>();
+            order.line_items.ForEach(i =>
+                invoiceRows.Add(new InvoiceRow
+                {
+                    Price = i.price,
+                })
+            )
+            ;
+
             return new Invoice()
             {
-                Currency = order.currency.ToUpper(),
+                Currency = "SEK",//order.currency.ToUpper(),
                 CurrencyRate = currencyRate,
                 FinalPayDate = (DateTime)order.date_paid,
                 YourOrderNumber = order.id.ToString(),
-                YourReference = order.customer_id.ToString(),
+                YourReference = order.billing.email,
 
-                CustomerName = order.billing.first_name + order.billing.last_name ?? $" {order.billing.last_name}",
+                CustomerName = (order.billing.first_name + $" {order.billing.last_name}").Trim(),
                 Address1 = order.billing.address_1,
                 Address2 = order.billing.address_2,
                 ZipCode = order.billing.postcode,
                 City = order.billing.city,
             };
+        }
+
+        private static string VerifyCoupon(OrderCouponLine coupon)
+        {
+            if ((coupon.discount != null && coupon.discount != 0.0M) || (coupon.discount_tax != null && coupon.discount_tax != 0.0M))
+            {
+                throw new Exception($"Unexpected discount amount: {coupon.discount} for discount code: {coupon.code}");
+            }
+
+            if (coupon.code == null)
+            {
+                throw new Exception("Order is missing discount code for applied discount");
+            }
+
+            return coupon.code;
+        }
+
+        public static bool HasFreeShaker(this WcOrder order) => order.coupon_lines.Any(coupon => coupon.code switch { "freeshaker" => true });
+
+        public static decimal GetAccurateTotal(this WcOrder order, bool? hasFreeShaker = null)
+        {
+            decimal total = (decimal)order.line_items.Sum(i => (i.price + i.subtotal_tax) * i.quantity);
+
+            float diff = MathF.Abs((float)(total - (decimal)(order.total - order.shipping_total)));
+
+            if (hasFreeShaker == null)
+            {
+                hasFreeShaker = order.HasFreeShaker();
+            }
+
+            if (hasFreeShaker == true)
+            {
+                // (!) NOTE: Assumes the price of shaker is 18 EUR
+                total -= (decimal)order.line_items.Sum(i => i.sku == "NAU007" ? i.quantity * 18.0M : 0.0M);
+            }
+            // Should not deviate more than 0.01 from WooCommerce total cost
+            if (diff > 0.01)
+            {
+                throw new Exception(
+                    string.Format("WooCommerce order total does not match calculated total. Difference: {0}, {1} = {2:0.000}{3}",
+                        total,
+                        order.total,
+                        diff,
+                        hasFreeShaker! == true
+                            ? " NOTE: Order contains free shaker(s), SKU: NAU007."
+                            : null)
+                );
+            }
+            return total;
         }
 
         public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate)
@@ -123,54 +181,29 @@ namespace Findus.Helpers
                 throw new Exception("WooCommerce order contains unexpected 'fee_lines'");
             if (order.discount_total != null && order.discount_total != 0.0M)
                 throw new Exception("WooCommerce order contains unexpected 'discount_total'");
-            if (order.coupon_lines != null && order.coupon_lines.Count != 0)
-            {
-                var discount = order.coupon_lines.FirstOrDefault();
-                if (discount!.code == null)
-                {
-                    throw new Exception($"Order Id: {order.id} is missing discount code for applied discount");
-                }
 
-                hasFreeShaker = discount.code switch
+            foreach (var coupon in order.coupon_lines)
+            {
+                VerifyCoupon(coupon);
+                hasFreeShaker = coupon.code switch
                 {
                     "freeshaker" => true,
                     "blackcherry" => throw new NotImplementedException(),
-                    _ => throw new Exception($"WooCommerce order contains unexpected discount code: {discount.code}"),
+                    _ => throw new Exception($"WooCommerce order contains unexpected discount code: {coupon.code}"),
                 };
             }
 
-            // Most accurate total:
-            decimal total = (decimal)order.line_items.Sum(i => (i.price + i.subtotal_tax) * i.quantity);
-            //total -= (decimal)order.cart_tax;
-            decimal totalShip = (decimal)order.shipping_total;
-            decimal totalShipVat = (decimal)order.shipping_tax;
+            decimal total = order.GetAccurateTotal(hasFreeShaker);
 
-            float diff = MathF.Abs((float)(total - (decimal)(order.total - totalShip)));
-
-            if (hasFreeShaker)
-            {
-                // (!) NOTE: Assumes the price of shaker is 18 EUR
-                total -= (decimal)order.line_items.Sum(i => i.sku == "NAU007" ? i.quantity * 18.0M : 0.0M);
-            }
-            // Should not deviate more than 0.01 from WooCommerce total cost
-            if (diff > 0.01)
-            {
-                throw new Exception(
-                    string.Format("WooCommerce order total does not match calculated total. Difference: {0}, {1} = {2:0.000}{3}",
-                        total,
-                        order.total,
-                        diff,
-                        hasFreeShaker ? " NOTE: Order contains free shaker(s), SKU: NAU007." : null
-                    )
-                );
-            }
-            decimal shippingSEK = totalShip * currencyRate;
-            decimal shippingVatSEK = totalShipVat * currencyRate;
+            decimal shippingSEK = (decimal)order.shipping_total * currencyRate;
+            decimal shippingVatSEK = (decimal)order.shipping_tax * currencyRate;
             decimal totalSEK = total * currencyRate;
 
             var paymentMethod = GetPaymentMethod(order);
 
-            var inv = new InvoiceAccrual();
+            var inv = new InvoiceAccrual() {
+                InvoiceAccrualRows = new List<InvoiceAccrualRow>()
+            };
 
             if (isInEu)
             {
@@ -196,18 +229,18 @@ namespace Findus.Helpers
                         info: $"Fraktkostnad VAT {vatAcc.Rate:P2}"
                     );
                 }
-                foreach (var item in order.line_items)
+                foreach (var item in order.line_items.OrderByDescending(i => i.price))
                 {
                     if (hasFreeShaker && item.sku == "NAU007") continue;
                     if (item.tax_class == "reduced-rate")
                     {
                         var acc = SalesAccount.Reduced;
-                        VerifyRate(acc, order, item);
+                        var taxLabel = VerifyRate(acc, order, item);
 
                         inv.AddRow(
                                 acc.AccountNr,
                                 credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Försäljning - {acc.Rate:P2}"
+                                info: $"Försäljning - {taxLabel}"
                             );
                         if (item.subtotal_tax > 0.0M)
                         {
@@ -215,18 +248,18 @@ namespace Findus.Helpers
                             inv.AddRow(
                                 acc.AccountNr,
                                 credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Utgående Moms - {acc.Rate:P2}"
+                                info: $"Utgående Moms - {taxLabel}"
                         );
                         }
                     }
                     else
                     {
                         var acc = SalesAccount.Standard;
-                        VerifyRate(acc, order, item);
+                        var taxLabel = VerifyRate(acc, order, item);
                         inv.AddRow(
                             acc.AccountNr,
                             credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
-                            info: $"Försäljning - {acc.Rate:P2}"
+                            info: $"Försäljning - {taxLabel}"
                     );
                         if (item.subtotal_tax > 0.0M)
                         {
@@ -234,7 +267,7 @@ namespace Findus.Helpers
                             inv.AddRow(
                                 acc.AccountNr,
                                 credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Utgående Moms - {acc.Rate:P2}"
+                                info: $"Utgående Moms - {taxLabel}"
                         );
                         }
                     }
@@ -271,10 +304,15 @@ namespace Findus.Helpers
                 }
             }
 
+            if(paymentMethod == "Stripe") {
+                decimal stripeFee = decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_fee").value);
+                inv.AddRow(1580, credit: stripeFee, info: "Stripe Avgift");
+                inv.AddRow(6570, debit: stripeFee, info: "Stripe Avgift");
+            }
             return inv;
         }
 
-        private static void VerifyRate(RateModel acc, WcOrder order, OrderLineItem item)
+        private static string VerifyRate(RateModel acc, WcOrder order, OrderLineItem item)
         {
             string taxLabel = order.tax_lines[
                 item.tax_class == "reduced-rate"
@@ -286,6 +324,7 @@ namespace Findus.Helpers
             {
                 throw new Exception($"VAT Rate miss-match, expected value: {acc.Rate:P2} VAT, but WooCommerce gave: {taxLabel}");
             }
+            return taxLabel;
         }
     }
 }

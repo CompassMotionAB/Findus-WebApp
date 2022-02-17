@@ -5,6 +5,7 @@
     var InvoiceAccrual = TempData["invoiceAccrual"] as Fortnox.SDK.Entities.InvoiceAccrual;
 
     var Order = @Model.Order;
+
 }
 
 @if (ViewBag.Error != null)
@@ -24,10 +25,14 @@
 
 <div style="width:50%; float: left;">
     <h1>WooCommerce</h1>
+    <div class="center-block">
+        @Html.Partial("Partial/DateRangePicker")
+    </div>
     @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block",
     @onchange="changeOrder(this)" })
 
-    @if(@Order != null) {
+    @if (@Order != null)
+    {
         @Html.DisplayFor(m=> @Order)
     }
 </div>
@@ -38,10 +43,12 @@
 
     <div>
         <h1>Fortnox</h1>
-        @if (@Invoice != null) {
+        @if (@Invoice != null)
+        {
             @Html.DisplayFor(m => @Invoice)
         }
-        @if (@InvoiceAccrual != null) {
+        @if (@InvoiceAccrual != null)
+        {
             @Html.DisplayFor(m => @InvoiceAccrual)
         }
     </div>
@@ -53,7 +60,7 @@
     function changeOrder(e) {
         location.href = replaceQueryParam("orderId", e.selectedOptions[0].value, location.href);
     }
-document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function () {
         var orderId = document.getElementById('Orders').value;
         if (location.href.indexOf('orderId=' + orderId) == -1) {
             location.href = replaceQueryParam("orderId", orderId, location.href);

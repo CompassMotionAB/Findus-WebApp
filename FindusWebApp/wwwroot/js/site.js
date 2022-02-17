@@ -22,10 +22,11 @@ function getQueryParameters(str) {
 function replaceQueryParam(param, newval, url) {
   var regex = new RegExp("([?;&])" + param + "[^&;]*[;&]?");
   var query = url.replace(regex, "$1").replace(/&$/, "");
-
+  
+  /*
   if(query == url && url.indexOf("?" == -1)) {
     query += "?";
-  }
+  }*/
 
   return (
     (query.length > 2 ? query + "&" : "") +

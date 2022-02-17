@@ -8,9 +8,18 @@
 <h2>Invoice</h2>
 <table>
     <tr>
-        <th>Total</th>
+        <th>Valutakurs (SEK-EUR)</th>
+        <th>Betalningsdatum?</th>
+
+        <th>Kund</th>
+        <th>Stad</th>
+        <th></th>
     </tr>
     <tr>
-        <td>@Model.Total</td>
+        <td>@($"{Model.CurrencyRate:0.######}")</td>
+        <td>@Html.DisplayFor(m => @Model.FinalPayDate)</td>
+
+        <td>@Model.CustomerName</td>
+        <td>@Model.City</td>
     </tr>
 </table>
