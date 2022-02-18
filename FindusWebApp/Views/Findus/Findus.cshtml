@@ -58,12 +58,11 @@
 
 <script>
     function changeOrder(e) {
-        location.href = replaceQueryParam("orderId", e.selectedOptions[0].value, location.href);
+        location.href = updateUrlParam(location.href, "orderId", e.selectedOptions[0].value);
     }
     document.addEventListener('DOMContentLoaded', function () {
         var orderId = document.getElementById('Orders').value;
-        if (location.href.indexOf('orderId=' + orderId) == -1) {
-            location.href = replaceQueryParam("orderId", orderId, location.href);
-        }
+        if (location.href.indexOf('orderId=' + orderId) == -1 && orderId != null)
+            location.href = updateUrlParam(location.href, "orderId", orderId);
     }, false);
 </script>

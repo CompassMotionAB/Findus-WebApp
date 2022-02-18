@@ -5,6 +5,8 @@
     Layout = null;
     var Invoices = TempData["InvoiceSubset"] as InvoiceSubset[];
     bool CustomerPage = (TempData["CustomerNr"] as String) != null;
+
+    var CheckBoxes = new Dictionary<string, bool>();
 }
 <div class="form-group">
     @if(!CustomerPage){
@@ -48,6 +50,11 @@
                 </td>
                 <td>@customer.Name</td>
                 <td>@customer.City</td>
+    <td>
+        <input type='checkbox' value='false' 
+            id='CheckBoxes_@(customer.CustomerNumber)'
+            name='CheckBoxes[@customer.CustomerNumber]' />
+    </td>
             </tr>
             @if (Invoices != null)
             {

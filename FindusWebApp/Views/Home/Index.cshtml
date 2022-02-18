@@ -1,8 +1,103 @@
 ﻿@{
     ViewData["Title"] = "Home Page";
 }
-
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container " style="border: solid;">
+    <div class="form-group">
+        <div class="row">
+            <div class="mx-auto text-left" style="">
+                @* <h1 class="display-4">Welcome</h1> *@
+                <h1 class="text-center"> @Html.ActionLink("Verifikat", "Verification", "Findus")</h1>
+                Skapar och Verifierar Fortnox faktureringar av beställning hämtad från WooCommerce.
+                <ul>
+                    <li>Proforma faktura</li>
+                    <ul>
+                        <li>
+                            Får VAT för Standard eller Reducerad (livsmedel) från WooCommerce.
+                            <img src="~/images/stripe_proforma.png"></img>
+                        </li>
+                        <li>
+                            Hämtar Riksbankens Växelkurs för EUR-SEK i dagsavslut för betalningsdatumet.
+                            <img src="~/images/currency_rate.png"></img>
+                        </li>
+                        <li>
+                            När betalningen har gjorts med Stripe så tar vi deras växelkurs som är kalkylerad vid betalningen.
+                            <img src="~/images/stripe_currency_rate.png"></img>
+                        </li>
+                        <li>
+                            Automatisk hantering av Stripe/PayPal avgift
+                            <img src="~/images/stripe_fee.png"></img>
+                        </li>
+                    </ul>
+                    <li>Faktura som speglar ordern från WooCommerce</li>
+                    <ul>
+                        <li>
+                            Kundinformation, Adress, Email, m.m.
+                        </li>
+                        <li>
+                            Produkt information i ordern, SKU & Pris
+                        </li>
+                    </ul>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
+<br />
+<div class="container col-md-8 mx-auto" style="border: solid;">
+    <div class="form-group">
+        <div class="row">
+            <div class="mx-auto" style="white-space: pre-wrap;">
+                <h1 class="text-center">@Html.ActionLink("Fortnox", "Index", "Fortnox", null, new {target="_blank"})</h1>
+                <h3 class="display-5 text-center">Login till Fortnox:</h3>
+                Användarnamn:
+                <input id="username" value="admin@1201602" style="max-width: 150px;" readonly /> <button class="btn"
+                    onclick="copyUsername();"><i class="fa fa-copy"></i></button>
+                Lösenord:
+                <input id="password" value="uggFIqgjdRivre3r" style="max-width: 150px;" readonly /> <button class="btn"
+                    onclick="copyPassword();"><i class="fa fa-copy"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .btn {
+        background-color: DodgerBlue;
+        /* Blue background */
+        border: none;
+        /* Remove borders */
+        color: white;
+        /* White text */
+        padding: 4px 6px;
+        /* Some padding */
+        font-size: 16px;
+        /* Set a font size */
+        cursor: pointer;
+        /* Mouse pointer on hover */
+    }
+
+    /* Darker background on mouse-over */
+    .btn:hover {
+        background-color: RoyalBlue;
+    }
+
+    img {
+        max-width: 425px;
+        margin-right: 100%;
+        padding-bottom: 1em;
+    }
+</style>
+
+<script type="text/javascript">
+
+    function copyUsername() {
+        copyToClipboard("username")
+    }
+    function copyPassword() {
+        copyToClipboard("password")
+    }
+    function copyToClipboard(id) {
+        var input = document.getElementById(id).value;
+        navigator.clipboard.writeText(input);
+    }
+</script>

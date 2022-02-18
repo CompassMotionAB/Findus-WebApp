@@ -15,6 +15,7 @@
             asp-fallback-test-property="position" asp-fallback-test-value="absolute" crossorigin="anonymous"
             integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" />
     </environment>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css" media="all" href="~/lib/daterangepicker/daterangepicker.css" />
     <link rel="stylesheet" href="~/css/site.css" />
 </head>
@@ -36,7 +37,7 @@
     </header>
     <div class="container">
         <partial name="_CookieConsentPartial" />
-        <partial name="_ToggleThemePartial" />
+        @* <partial name="_ToggleThemePartial" /> *@
         <main role="main" class="pb-3">
             @RenderBody()
         </main>

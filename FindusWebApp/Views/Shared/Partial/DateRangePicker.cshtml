@@ -5,8 +5,8 @@
 
 <script type="text/javascript">
     function updateDateParameters(dateFrom, dateTo) {
-        newHref = replaceQueryParam("dateFrom", dateFrom, location.href);
-        location.href = replaceQueryParam("dateTo", dateTo, newHref);
+        newHref = updateUrlParam(location.href, "dateFrom", dateFrom);
+        location.href = updateUrlParam(newHref, "dateTo", dateTo);
     }
     document.addEventListener("DOMContentLoaded", function () {
         var params = getQueryParameters(location.href)
