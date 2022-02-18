@@ -54,6 +54,9 @@ namespace FindusWebApp
             services.AddSingleton<FortnoxSettings>();
             services.Configure<OAuth2Keys>(Configuration.GetSection(OAuth2Keys.Name));
 
+            services.Configure<WooKeys>(Configuration.GetSection(WooKeys.Name));
+            services.AddSingleton<WooKeys>();
+
             services.AddHttpClient();
             services.AddHttpContextAccessor();
 
