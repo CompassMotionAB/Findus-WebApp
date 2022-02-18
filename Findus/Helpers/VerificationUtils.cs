@@ -134,8 +134,7 @@ namespace Findus.Helpers
 
         public static decimal GetAccurateTotal(this WcOrder order)
         {
-            decimal total = (decimal)order.line_items.Sum(i => (i.price + i.taxes.Sum(t => t.total)) * i.quantity);
-
+            decimal total = (decimal)order.line_items.Sum(i => (i.price * i.quantity) + i.taxes.Sum(t => t.total));
             float diff = MathF.Abs((float)(total - (decimal)(order.total - order.shipping_total)));
 
             // Should not deviate more than 0.01 from WooCommerce total cost
