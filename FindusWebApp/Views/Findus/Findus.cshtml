@@ -4,7 +4,8 @@
     var Invoice = TempData["invoice"] as Fortnox.SDK.Entities.Invoice;
     var InvoiceAccrual = TempData["invoiceAccrual"] as Fortnox.SDK.Entities.InvoiceAccrual;
 
-    var Order = @Model.Order;
+    var Order = @Model != null ? @Model.Order : null;
+    var OrderSelect = @Model != null ? @Model.OrderSelect : null;
 
 }
 
@@ -25,11 +26,12 @@
 
 <div style="width:50%; float: left;">
     <h1>WooCommerce</h1>
-    <div class="center-block">
-        @Html.Partial("Partial/DateRangePicker")
-    </div>
-    @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block",
-    @onchange="changeOrder(this)" })
+    @if(@OrderSelect != null){
+        <div class="center-block">
+            @Html.Partial("Partial/DateRangePicker")
+        </div>
+        @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @onchange="changeOrder(this)" })
+    }
 
     @if (@Order != null)
     {
