@@ -160,7 +160,6 @@ namespace Findus.Helpers
             bool isInEu = VerificationUtils.IsInsideEU(countryIso);
             bool isStandard = VerificationUtils.OnlyStandardRate(order.line_items);
             bool isReduced = !isStandard;
-            bool hasFreeShaker = false;
             bool hasShippingCost = order.shipping_lines.Count > 0 && order.shipping_total > 0;
 
             if (order.fee_lines != null && order.fee_lines.Count != 0)
@@ -171,10 +170,9 @@ namespace Findus.Helpers
             foreach (var coupon in order.coupon_lines)
             {
                 VerifyCoupon(coupon);
-                hasFreeShaker = coupon.code switch
+                _ = coupon.code switch
                 {
                     "freeshaker" => true,
-                    "blackcherry" => throw new NotImplementedException(),
                     _ => throw new Exception($"WooCommerce order contains unexpected discount code: {coupon.code}"),
                 };
             }
@@ -219,7 +217,6 @@ namespace Findus.Helpers
                 }
                 foreach (var item in order.line_items.OrderByDescending(i => i.price))
                 {
-                    if (hasFreeShaker && item.sku == "NAU007") continue;
                     if (item.tax_class == "reduced-rate")
                     {
                         var acc = SalesAccount.Reduced;
