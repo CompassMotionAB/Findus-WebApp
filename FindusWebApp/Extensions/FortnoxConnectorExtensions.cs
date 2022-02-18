@@ -27,7 +27,7 @@ namespace FindusWebApp.Extensions
             var largeInvoiceCollection = await connector.FindAsync(searchSettings);
             var totalInvoices = largeInvoiceCollection.TotalResources;
 
-            var neededPages = Utilities.GetNeededPages(minPerPage, maxPerPage, totalInvoices);
+            var neededPages = HttpUtilities.GetNeededPages(minPerPage, maxPerPage, totalInvoices);
             var mergedCollection = new List<InvoiceSubset>();
 
             for (var i = 0; i < neededPages; i++)
@@ -52,7 +52,7 @@ namespace FindusWebApp.Extensions
             var largeCustomerCollection = await connector.FindAsync(searchSettings);
             var totalCustomers = largeCustomerCollection.TotalResources;
 
-            var neededPages = Utilities.GetNeededPages(minPerPage, maxPerPage, totalCustomers);
+            var neededPages = HttpUtilities.GetNeededPages(minPerPage, maxPerPage, totalCustomers);
             var mergedCollection = new List<CustomerSubset>();
 
             for (var i = 0; i < neededPages; i++)

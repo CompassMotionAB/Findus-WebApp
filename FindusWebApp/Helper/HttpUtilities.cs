@@ -3,7 +3,7 @@ using System;
 namespace FindusWebApp.Helper
 {
 
-    public static class Utilities
+    public static class HttpUtilities
     {
         public static int GetNeededPages(int pageSize, int maxPerPage, int totalInvoices)
         {
