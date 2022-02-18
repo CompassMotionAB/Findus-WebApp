@@ -24,40 +24,53 @@ licenses. This section summarizes those components and their licenses.
 See licenses/ for text of these licenses.
 
 
-MIT License
+MIT Licenses
 -----------
-OAuth2_CoreMVC_Sample/wwwroot/lib/bootstrap
-OAuth2_CoreMVC_Sample/wwwroot/lib/daterangepicker
-OAuth2_CoreMVC_Sample/wwwroot/lib/jquery-validation
+see ./licenses/LICENCE-bootstrap.txt
+see ./licenses/LICENCE-daterangepicker.txt
+see ./licenses/LICENCE-jquery-validation.txt
+
+FindusWebApp/wwwroot/lib/bootstrap
+FindusWebApp/wwwroot/lib/daterangepicker
+FindusWebApp/wwwroot/lib/jquery-validation
 
 JS Foundation
 -------------
-OAuth2_CoreMVC_Sample/wwwroot/lib/jquery
+see ./licenses/LICENCE-jquery.txt
+
+FindusWebApp/wwwroot/lib/jquery
 
 Apache Software Foundation License 2.0
 --------------------------------------
-OAuth2_CoreMVC_Sample/wwwroot/lib/jquery-validation-unobtrusive
+see ./licenses/LICENCE-jquery-validation-unobtrusive.txt
 
+FindusWebApp/wwwroot/lib/jquery-validation-unobtrusive
 
- Intuit, Inc - Apache Software Foundation License 2.0
+Font Awesome Free License (Code Licence for CSS) - MIT License 
+--------------------------------------------------------------
+see ./licenses/LICENCE-font-awesome.txt
+
+FindusWebApp/Views/Shared/_Layout.cshtml
+
+Intuit, Inc - Apache Software Foundation License 2.0
 -----------------------------------------------
+see ./licenses/LICENCE-intuit.txt
 
 Source code significantly adapted from:
 https://github.com/IntuitDeveloper/OAuth2_DotnetCore_MVC5_SampleApp
 
+FindusWebApp/Program.cs
+FindusWebApp/Startup.cs
 
-OAuth2_CoreMVC_Sample/Program.cs
-OAuth2_CoreMVC_Sample/Startup.cs
+FindusWebApp/Controllers/ConnectController.cs
+FindusWebApp/Controllers/FortnoxController.cs ( adapted from QBOController.cs)
+FindusWebApp/Controllers/HomeController.cs
+FindusWebApp/Helper/OAuth2Keys.cs
+FindusWebApp/Migration/*.cs
+FindusWebApp/Models/*.cs
 
-OAuth2_CoreMVC_Sample/Controllers/ConnectController.cs
-OAuth2_CoreMVC_Sample/Controllers/FortnoxController.cs ( adapted from QBOController.cs)
-OAuth2_CoreMVC_Sample/Controllers/HomeController.cs
-OAuth2_CoreMVC_Sample/Helper/OAuth2Keys.cs
-OAuth2_CoreMVC_Sample/Migration/*.cs
-OAuth2_CoreMVC_Sample/Models/*.cs
-
-OAuth2_CoreMVC_Sample/Views/Connect/Connect.cshtml
-OAuth2_CoreMVC_Sample/Views/Fortnox/Fortnox.cshtml ( adapted from QBO/QBO.cshtml )
-OAuth2_CoreMVC_Sample/Views/Home/*.cshtml
-OAuth2_CoreMVC_Sample/Views/Shared/*.cshtml
-OAuth2_CoreMVC_Sample/wwwroot/css/site.css
+FindusWebApp/Views/Connect/Connect.cshtml
+FindusWebApp/Views/Fortnox/Fortnox.cshtml ( adapted from QBO/QBO.cshtml )
+FindusWebApp/Views/Home/*.cshtml
+FindusWebApp/Views/Shared/*.cshtml
+FindusWebApp/wwwroot/css/site.css
