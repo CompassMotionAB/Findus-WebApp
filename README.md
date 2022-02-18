@@ -4,7 +4,7 @@
 Skapar och Verifierar Fortnox faktureringar av beställning hämtad från
 WooCommerce.
 
-Proforma faktura
+Proforma faktura:
 
 -   Får VAT för Standard eller Reducerad(livsmedel) skatt från WooCommerce.  
     ![](FindusWebApp/wwwroot/images/table_header.png)
@@ -19,7 +19,7 @@ Proforma faktura
     ![](FindusWebApp/wwwroot/images/table_header.png)
     ![](FindusWebApp/wwwroot/images/stripe_fee.png)
 
-Faktura som speglar ordern från WooCommerce
+Faktura som speglar ordern från WooCommerce:
 
 -   Kundinformation, Adress, Email, m.m.
 -   Produkt information i ordern, SKU & Pris
