@@ -3,6 +3,8 @@
 @{
     var Customers = TempData["CustomerSubset"] as List<CustomerSubset>;
     var CompanyName = ViewData["CompanyName"] as String;
+
+    var ErrorMessage = ViewBag.Error as String;
 }
 <div class="mx-5">
     @if (CompanyName != null)
@@ -12,15 +14,10 @@
         </div>
         <br />
     }
-
-    @if (ViewData["FortnoxError"] != null)
+    
+    @if (ErrorMessage != null)
     {
-        <div style="text-danger">@Html.Raw(ViewData["FortnoxError"])</div>
-        <br />
-    }
-    @if (ViewData["ErrorMessage"] != null)
-    {
-        <div style="text-danger">@Html.Raw(ViewData["ErrorMessage"])</div>
+        <div style="text-danger">@ErrorMessage</div>
         <br />
     }
 

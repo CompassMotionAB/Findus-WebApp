@@ -43,7 +43,7 @@ namespace FindusWebApp.Controllers
             }
             catch (FortnoxApiException ex)
             {
-                ViewData["ErrorMessage"] = ex.Message;
+                ViewBag.Error = ex.Message;
             }
         }
         private async Task<IActionResult> CallRedirect(Action<FortnoxContext> action)
@@ -64,7 +64,7 @@ namespace FindusWebApp.Controllers
                 }
                 else
                 {
-                    ViewData["ErrorMessage"] = ex.Message;
+                    ViewBag.Error = ex.Message;
                 }
             }
             return View("Fortnox");
@@ -152,7 +152,7 @@ namespace FindusWebApp.Controllers
             }
             catch (Exception ex)
             {
-                ViewData["ErrorInfo"] = ex.Message;
+                ViewBag.Error = ex.Message;
             }
             return new EmptyResult();
         }

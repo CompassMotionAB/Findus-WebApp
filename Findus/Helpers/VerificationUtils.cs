@@ -46,7 +46,7 @@ namespace Findus.Helpers
             return EUCountries.Contains(isoCode.ToUpper());
         }
 
-        internal static bool OnlyStandardRate(List<OrderLineItem> line_items)
+        internal static bool ContainsNoReducedRate(List<OrderLineItem> line_items)
         {
             if (!line_items.TrueForAll(o => o.tax_class == "reduced-rate" || o.tax_class == "normal-rate" || string.IsNullOrEmpty(o.tax_class)))
             {
@@ -59,21 +59,19 @@ namespace Findus.Helpers
         {
             var payment = order.payment_method.ToLower();
 
-            // Catch-all: stripe & stripe_{bancontant,ideal}
-            if (new Regex(@"^stripe\S*").IsMatch(payment))
-            {
-                return "Stripe";
-            }
-            return payment switch
-            {
-                "paypal" => "PayPal",
-                _ => throw new Exception(String.Format(
-                     "Payment Method: '{0}' unexpected." + Environment.NewLine +
-                     "Payment Method Title: {1}",
-                     order.payment_method,
-                     order.payment_method_title)
-                 ),
-            };
+            // NOTE: Catch-all: stripe & stripe_{bancontant,ideal}
+            return new Regex(@"^stripe\S*").IsMatch(payment)
+                ? "Stripe"
+                : payment switch
+                {
+                    "paypal" => "PayPal",
+                    _ => throw new Exception(String.Format(
+                         "Payment Method: '{0}' unexpected." + Environment.NewLine +
+                         "Payment Method Title: {1}",
+                         order.payment_method,
+                         order.payment_method_title)
+                     ),
+                };
         }
 
         public static bool OnlyReducedRate(List<OrderLineItem> line_items)
@@ -84,7 +82,6 @@ namespace Findus.Helpers
             }
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
-
 
         public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null)
         {
@@ -130,7 +127,7 @@ namespace Findus.Helpers
             return coupon.code;
         }
 
-        public static bool HasFreeShaker(this WcOrder order) => order.coupon_lines.Any(coupon => coupon.code == "freeshaker" );
+        public static bool HasFreeShaker(this WcOrder order) => order.coupon_lines.Any(coupon => coupon.code == "freeshaker");
 
         public static decimal GetAccurateTotal(this WcOrder order)
         {
@@ -158,7 +155,7 @@ namespace Findus.Helpers
             var countryIso = order.billing.country;
 
             bool isInEu = VerificationUtils.IsInsideEU(countryIso);
-            bool isStandard = VerificationUtils.OnlyStandardRate(order.line_items);
+            bool isStandard = VerificationUtils.ContainsNoReducedRate(order.line_items);
             bool isReduced = !isStandard;
             bool hasShippingCost = order.shipping_lines.Count > 0 && order.shipping_total > 0;
 

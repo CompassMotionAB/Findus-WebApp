@@ -7,30 +7,37 @@
     var Order = @Model != null ? @Model.Order : null;
     var OrderSelect = @Model != null ? @Model.OrderSelect : null;
 
+    bool OnlyWc = Invoice == null && InvoiceAccrual == null;
+    bool Verification = !OnlyWc;
 }
 
 @if (ViewBag.Error != null)
 {
-    <p style="font-weight:normal;color:red">
-    <br />
-    @Html.Raw(ViewBag.Error)
-</p>
+        <p style="font-weight:normal;color:red">
+        <br />
+        @Html.Raw(ViewBag.Error)
+    </p>
 }
 @if (ViewBag.Message != null)
 {
-    <p style="font-weight:normal;color:green">
-    <br />
-    @Html.Raw(ViewBag.Message)
-</p>
+        <p style="font-weight:normal;color:green">
+        <br />
+        @Html.Raw(ViewBag.Message)
+    </p>
 }
 
-<div style="width:50%; float: left;">
+<div class="@(OnlyWc ? "" : "side-bar-left")">
     <h1>WooCommerce</h1>
-    @if(@OrderSelect != null){
-        <div class="center-block">
-            @Html.Partial("Partial/DateRangePicker")
-        </div>
-        @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @onchange="changeOrder(this)" })
+    <div class="center-block">
+                @Html.Partial("Partial/DateRangePicker")
+    </div>
+    @if (@OrderSelect != null)
+    {
+        @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @style="width: auto;", @onchange="changeOrder(this)" })
+            <a asp-controller="Findus" asp-action=@(Verification ? "Order" : "Verification")
+                asp-all-route-data="@Model.OrderRouteData" >
+                    @(Verification ? "Gå till Order" : "Verifiera Order")
+            </a>
     }
 
     @if (@Order != null)
@@ -38,23 +45,25 @@
         @Html.DisplayFor(m=> @Order)
     }
 </div>
-
-<div style="float:right;width: 45%;">
+@if (!OnlyWc)
+{
+    <div class="side-bar-right">
 
     <div class="vertical-divider"></div>
 
     <div>
         <h1>Fortnox</h1>
         @if (@Invoice != null)
-        {
-            @Html.DisplayFor(m => @Invoice)
-        }
+            {
+                @Html.DisplayFor(m => @Invoice)
+            }
         @if (@InvoiceAccrual != null)
         {
             @Html.DisplayFor(m => @InvoiceAccrual)
         }
+        </div>
     </div>
-</div>
+}
 
 <div style="clear:both"></div>
 

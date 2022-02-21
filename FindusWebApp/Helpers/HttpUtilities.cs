@@ -1,6 +1,6 @@
 using System;
 
-namespace FindusWebApp.Helper
+namespace FindusWebApp.Helpers
 {
 
     public static class HttpUtilities

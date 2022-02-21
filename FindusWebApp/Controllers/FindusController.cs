@@ -1,4 +1,3 @@
-using Customer = Fortnox.SDK.Entities.Customer;
 using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 using Microsoft.AspNetCore.Mvc;
@@ -15,14 +14,13 @@ using Newtonsoft.Json;
 using FindusWebApp.Models;
 using Microsoft.Extensions.Caching.Memory;
 using System.Globalization;
-using FindusWebApp.Helper;
+using FindusWebApp.Helpers;
 using Microsoft.Extensions.Options;
 
 namespace FindusWebApp.Controllers
 {
     public class FindusController : Controller
     {
-
         private readonly WooKeys _wcKeys;
         private readonly WCObject.WCOrderItem _wcOrderApi;
         private readonly IHttpClientFactory _httpClientFactory;
@@ -39,9 +37,12 @@ namespace FindusWebApp.Controllers
 
             _wcKeys = wcKeysOptions.Value;
 
-            if(string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url)) {
+            if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
+            {
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
-            } else {
+            }
+            else
+            {
                 RestAPI restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
                 _wcOrderApi = new WCObject.WCOrderItem(restJwt);
             }
@@ -49,58 +50,14 @@ namespace FindusWebApp.Controllers
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
 
-        public async Task<ActionResult> Index(string dateFrom = null, string dateTo = null)
+        public ActionResult Index()
         {
-            if(string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url)) {
+            if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
+            {
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
                 return View("Findus");
             }
-            var orders = await FetchOrdersAsync(dateFrom, dateTo);
-            _orderViewModel = new OrderViewModel(orders);
-            return View("Findus", _orderViewModel);
-        }
-
-        private async Task<WcOrder> FetchOrderAsync(ulong orderId)
-        {
-            return await _wcOrderApi.Get((int)orderId);
-        }
-        private async Task<List<WcOrder>> FetchOrdersAsync(string dateFrom = null, string dateTo = null)
-        {
-            bool noFrom = string.IsNullOrEmpty(dateFrom);
-            bool noTo = string.IsNullOrEmpty(dateTo);
-            if (noFrom != noTo)
-            {
-                throw new ArgumentException($"Expected dateFrom and dateTo to be either null or both defined. Received: dateFrom: {dateFrom}, dateTo:{dateTo}");
-            }
-
-            DateTime dateAfter;
-            DateTime dateBefore;
-
-            if (noFrom && noTo)
-            {
-                dateAfter = DateTime.Now.AddDays(-7);
-                dateBefore = DateTime.Now;
-            }
-            else
-            {
-                dateAfter = DateTime.ParseExact(dateFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                dateBefore = DateTime.ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture).EndOfDay();
-            }
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders";
-
-            if (!_memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
-            {
-                orders = await _wcOrderApi.GetAll(new Dictionary<string, string>() {
-                    {"page", "1"},
-                    {"per_page", "16"},
-                    {"after", $"{dateAfter:yyyy-MM-ddTHH:mm:ss}"},
-                    {"before", $"{dateBefore:yyyy-MM-ddTHH:mm:ss}"},
-                    {"status", "completed"}
-                });
-
-                _memoryCache.Set(cacheKey, orders, _orderCacheOptions);
-            }
-            return orders;
+            return View("Findus");
         }
 
         private async Task<decimal> GetCurrencyRate(WcOrder order, decimal? accurateTotal = null)
@@ -112,7 +69,8 @@ namespace FindusWebApp.Controllers
                 decimal stripeNet = decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_net").value);
                 string stripeCurrency = (string)order.meta_data.First(d => d.key == "_stripe_currency").value;
 
-                if(!stripeCharge) {
+                if (!stripeCharge)
+                {
                     throw new Exception("Unexpected: _stripe_charge_captured == false");
                 }
                 if (stripeCurrency != "SEK")
@@ -141,24 +99,17 @@ namespace FindusWebApp.Controllers
             return await CurrencyUtils.GetSEKCurrencyRateAsync(date, order.currency.ToUpper(), httpClient);
         }
 
-        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute)
         {
-            if(_wcOrderApi == null) {
-                return RedirectToAction("Index");
-            }
-            if (_orderViewModel == null)
-            {
-                var orders = await FetchOrdersAsync(dateFrom, dateTo);
-                _orderViewModel = new OrderViewModel(orders, orderId);
-            }
-            WcOrder order = _orderViewModel.GetOrder();
-
-            var accounts = new AccountsModel(
-                Utilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
-                Utilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
-            );
             try
             {
+                _orderViewModel = new OrderViewModel(orders, orderRoute);
+                WcOrder order = _orderViewModel.GetOrder();
+
+                var accounts = new AccountsModel(
+                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
+                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
+                );
                 decimal accurateTotal = order.GetAccurateTotal();
 
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
@@ -173,8 +124,63 @@ namespace FindusWebApp.Controllers
             {
                 ViewBag.Error = ex.Message;
             }
+            return View("Findus", _orderViewModel);
+        }
+
+        public async Task<ActionResult> Order(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        {
+            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
+            if (orderRoute.IsValid())
+            {
+                var orders = await Get(orderRoute);
+                _orderViewModel = new OrderViewModel(orders, orderRoute);
+            }
 
             return View("Findus", _orderViewModel);
+        }
+
+        private async Task<List<WcOrder>> Get(OrderRouteModel orderRoute)
+        {
+            var orders = new List<WcOrder>();
+            if (orderRoute.HasDateRange())
+            {
+                return await _wcOrderApi.GetOrders(orderRoute.DateFrom, orderRoute.DateTo, _memoryCache);
+            }
+            try
+            {
+                orders.Add(await _wcOrderApi.Get(orderRoute.OrderId));
+            }
+            catch (Exception ex)
+            {
+                // TODO: 
+                // Json Parse:
+                /* {
+                    "code":"woocommerce_rest_shop_order_invalid_id",
+                    "message":"Invalid ID.",
+                    "data":{ "status":404 }
+                    }
+                */
+                // And use switch with "message" content
+
+                ViewBag.Error = "Woo Commerce Error, Message: " +
+                ex.Message.Contains("Invalid ID.") switch
+                {
+                    true => $"Invalid Order ID: {orderRoute.OrderId}",
+                    _ => ex.Message
+                };
+            }
+            return orders;
+        }
+
+        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        {
+            if (_wcOrderApi == null)
+            {
+                return RedirectToAction("Index");
+            }
+            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
+            var orders = await Get(orderRoute);
+            return await VerifyOrder(orders, orderRoute);
         }
     }
 }

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using FindusWebApp.Helper;
+using FindusWebApp.Helpers;
 using FindusWebApp.Models;
 using FindusWebApp.Services.Fortnox;
 using Microsoft.IdentityModel.Logging;

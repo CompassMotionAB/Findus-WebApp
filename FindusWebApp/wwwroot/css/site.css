@@ -197,3 +197,13 @@ td {
   width: 100%;
   display: inline-block;
 }
+
+.side-bar-left {
+  width: 50%;
+  float: left;
+}
+
+.side-bar-right {
+  width: 45%;
+  float: right;
+}

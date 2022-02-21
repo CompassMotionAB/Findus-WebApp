@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 
 namespace Findus.Helpers
 {
-    public static class Utilities
+    public static class JsonUtilities
     {
         public static T LoadJson<T>(string jsonFilePath, JsonSerializerSettings jsonSettings = null!)
         {
@@ -13,6 +13,5 @@ namespace Findus.Helpers
             if (string.IsNullOrEmpty(json)) throw new ArgumentException($"Failed to parse json file {jsonFilePath}");
             return JsonConvert.DeserializeObject<T>(json, jsonSettings);
         }
-        
     }
 }

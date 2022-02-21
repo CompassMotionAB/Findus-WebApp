@@ -14,7 +14,6 @@ namespace Findus.Helpers
         {
             string dateStringFrom = String.Format("{0:yyyy-M-d}", date.AddDays(-7));
             string dateStringTo = String.Format("{0:yyyy-M-d}", date);
-            string dateStringNow = String.Format("{0:yyyy-M-d}", DateTime.Now);
 
             HttpResponseMessage response;
             try
@@ -24,7 +23,7 @@ namespace Findus.Helpers
             }
             catch (HttpRequestException ex)
             {
-                throw new Exception(String.Format("Failed to fetch currency (SEK-{0}) for date({1). HttpRequestException: {2}", currency, dateStringTo, ex.Message));
+                throw new Exception($"Failed to fetch currency: SEK-{currency}, for date: {dateStringTo} - {ex.Message}");
             }
 
             //csv = await response.Content.ReadAsStringAsync();

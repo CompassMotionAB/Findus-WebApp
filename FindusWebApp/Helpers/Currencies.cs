@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace FindusWebApp.Helper
+namespace FindusWebApp.Helpers
 {
     public static class Currencies
     {

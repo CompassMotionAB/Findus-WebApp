@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Fortnox.SDK.Entities;
 using Fortnox.SDK.Interfaces;
 using Fortnox.SDK.Search;
-using FindusWebApp.Helper;
+using FindusWebApp.Helpers;
 
 namespace FindusWebApp.Extensions
 {

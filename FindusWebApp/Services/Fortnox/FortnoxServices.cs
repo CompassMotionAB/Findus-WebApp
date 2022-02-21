@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FindusWebApp.Models;
-using FindusWebApp.Helper;
+using FindusWebApp.Helpers;
 using FindusWebApp.Extensions;
 using System.Collections.Generic;
 using Fortnox.SDK.Entities;

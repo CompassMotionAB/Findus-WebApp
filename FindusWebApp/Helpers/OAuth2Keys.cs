@@ -1,4 +1,4 @@
-﻿namespace FindusWebApp.Helper
+﻿namespace FindusWebApp.Helpers
 {
     public class OAuth2Keys
     {
