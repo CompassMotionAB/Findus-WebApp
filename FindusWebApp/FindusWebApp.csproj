@@ -13,7 +13,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  
+     <ItemGroup>
+      <None Include="wwwroot/**" Link="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="Always" />
+    </ItemGroup> 
+
   <ItemGroup>
     <PackageReference Include="Fortnox.NET.SDK" Version="4.3.0" />
     <PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="3.6.0" />

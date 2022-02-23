@@ -26,6 +26,7 @@ namespace FindusWebApp.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMemoryCache _memoryCache;
         private readonly MemoryCacheEntryOptions _orderCacheOptions;
+        private readonly AccountsModel _accounts;
         private OrderViewModel _orderViewModel;
 
         public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions)
@@ -46,17 +47,26 @@ namespace FindusWebApp.Controllers
                 RestAPI restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
                 _wcOrderApi = new WCObject.WCOrderItem(restJwt);
             }
+            _accounts = new AccountsModel(
+                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
+                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
+                );
 
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
 
-        public ActionResult Index()
+        public async Task<ActionResult> Index(string dateFrom = null, string dateTo = null)
         {
             if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
             {
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
                 return View("Findus");
             }
+            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
+            var orders = await Get(orderRoute);
+            ViewData["Orders"] = orders;
+            ViewData["OrderValidation"] = orders.ToDictionary(order => order.id, async order => await VerifyOrderBool(order));
+            //_orderViewModel = new OrderViewModel(await Get(orderRoute), orderRoute);
             return View("Findus");
         }
 
@@ -99,32 +109,57 @@ namespace FindusWebApp.Controllers
             return await CurrencyUtils.GetSEKCurrencyRateAsync(date, order.currency.ToUpper(), httpClient);
         }
 
-        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute)
+        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = false)
         {
             try
             {
                 _orderViewModel = new OrderViewModel(orders, orderRoute);
                 WcOrder order = _orderViewModel.GetOrder();
 
-                var accounts = new AccountsModel(
-                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
-                    JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
-                );
                 decimal accurateTotal = order.GetAccurateTotal();
 
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
 
-                var inv = VerificationUtils.GenInvoice(order, currencyRate);
-                var invAccrual = VerificationUtils.GenInvoiceAccrual(order, accounts, currencyRate, accurateTotal);
+                var invoice = VerificationUtils.GenInvoice(order, currencyRate);
+                var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify);
 
-                TempData["invoice"] = inv;
-                TempData["invoiceAccrual"] = invAccrual;
+                TempData["Invoice"] = invoice;
+                TempData["InvoiceAccrual"] = invoiceAccrual;
             }
             catch (Exception ex)
             {
                 ViewBag.Error = ex.Message;
             }
             return View("Findus", _orderViewModel);
+        }
+
+        [HttpGet]
+        [Route("api/orders/verify")]
+        public async Task<bool> VerifyOrderBool(ulong? orderId, string dateFrom = null, string dateTo = null) {
+            return await VerifyOrderBool(new OrderRouteModel(orderId, dateFrom, dateTo));
+        }
+
+        private async Task<bool> VerifyOrderBool(OrderRouteModel orderRoute) {
+            var order = (await Get(orderRoute)).FirstOrDefault();
+            return await VerifyOrderBool(order);
+        }
+
+        private async Task<bool> VerifyOrderBool(WcOrder order)
+        {
+            Fortnox.SDK.Entities.InvoiceAccrual invoiceAccrual;
+            Fortnox.SDK.Entities.Invoice invoice;
+
+            try {
+                decimal accurateTotal = order.GetAccurateTotal();
+                decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
+                invoice = VerificationUtils.GenInvoice(order, currencyRate);
+                invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal);
+            } catch( Exception ex) {
+                ViewBag.Error = ex.Message;
+                return false;
+            }
+
+            return invoice != null && invoiceAccrual != null;
         }
 
         public async Task<ActionResult> Order(ulong? orderId = null, string dateFrom = null, string dateTo = null)
@@ -172,7 +207,7 @@ namespace FindusWebApp.Controllers
             return orders;
         }
 
-        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = false)
         {
             if (_wcOrderApi == null)
             {
@@ -180,7 +215,7 @@ namespace FindusWebApp.Controllers
             }
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             var orders = await Get(orderRoute);
-            return await VerifyOrder(orders, orderRoute);
+            return await VerifyOrder(orders, orderRoute, simplify);
         }
     }
 }

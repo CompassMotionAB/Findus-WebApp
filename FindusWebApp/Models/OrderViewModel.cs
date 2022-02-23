@@ -27,8 +27,8 @@ namespace FindusWebApp.Models
         {
             get
             {
+                //NOTE: Sorts by date paid or completed
                 return new SelectList(from o in Orders.OrderByDescending(
-                                       //NOTE: Sort by date paid/completed
                                        x => x.Value.date_paid ?? x.Value.date_completed)
                                       select new
                                       {
@@ -82,7 +82,7 @@ namespace FindusWebApp.Models
         }
         public WcOrder GetOrder()
         {
-            return Orders.FirstOrDefault(o => o.Key == CurrentId).Value;
+            return  GetOrder(CurrentId);
         }
 
         public WcOrder GetOrder(ulong? orderId = null)

@@ -81,11 +81,13 @@ namespace Findus.Models
         }
 
         public RateModel GetSales(string countryIso, bool isStandard = false, bool isReduced = false) {
-            if(isStandard && isReduced) throw new ArgumentException("");
+            if(isStandard && isReduced) throw new ArgumentException();
+            if(!Sales.ContainsKey(countryIso)) countryIso = "NON_EU";
             return isStandard ? Sales[countryIso].Standard : Sales[countryIso].Reduced;
         }
         public RateModel GetVAT(string countryIso, bool isStandard = false, bool isReduced = false) {
             if(isStandard && isReduced) throw new ArgumentException("");
+            if(!VAT.ContainsKey(countryIso)) countryIso = "NON_EU";
             return isStandard ? VAT[countryIso].Standard : VAT[countryIso].Reduced;
         }
     }

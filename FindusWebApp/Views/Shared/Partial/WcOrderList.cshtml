@@ -1,0 +1,29 @@
+@model IEnumerable<WooCommerceNET.WooCommerce.v2.Order>
+@{
+    Layout = null;
+    var OrderValidation = ViewData["OrderValidation"] as Dictionary<ulong, bool>;
+}
+@if (Model != null)
+{
+    <table id="orderTable" cellpadding="0" cellspacing="0">
+    <tr>
+        <th></th>
+        <th>Order Id</th>
+        <th>Valid</th>
+    </tr>
+    @foreach (var order in Model)
+        {
+            <tr>
+                <td></td>
+                <td>@order.id</td>
+                <td>
+                    @(OrderValidation.First(i => i.Key == order.id).Value ? "True" : "False")
+                </td>
+            </tr>
+        }
+    </table>
+}
+else
+{
+    <div class="text-danger">No Orders found</div>
+}

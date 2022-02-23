@@ -9,6 +9,84 @@ using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
 {
+    public class InvoiceAccrualData
+    {
+        public WcOrder Order;
+
+        public IOrderedEnumerable<OrderLineItem> Items()
+        {
+            return Order.line_items.OrderByDescending(i => i.price);
+        }
+
+        public string GetTaxLabel(RateModel account, bool? isStandard = null)
+        {
+            return VerificationUtils.VerifyRate(account, Order, isStandard: isStandard ?? IsStandard);
+        }
+
+        public bool TotalStandardRateEquals(decimal value = 0.0M)
+        {
+            if (IsInEu)
+            {
+                return GetSalesAcc(IsStandard).Rate + GetVatAcc(IsStandard).Rate == value;
+            }
+            else
+            {
+                return GetSalesAcc(IsStandard, PaymentMethod).Rate + GetVatAcc(IsStandard, PaymentMethod).Rate == value;
+            }
+        }
+
+        public string CountryIso;
+        public AccountsModel Accounts { get; internal set; }
+        public AccountModel SalesAcc;
+        public AccountModel VatAcc;
+
+        /// <summary>
+        /// <returns>
+        /// Returns either Reduced or Standard Sales Account
+        /// Always returns the highest TAX Rate of the order, assuming that reduced VAT <= standard VAT.
+        /// If NO items in order has reduced rate, the order is considered Standard rate.
+        /// </returns>
+        /// </summary>
+        public RateModel GetSalesAcc(bool? isStandard = null, string paymentMethod = null, string countryIso = null)
+        {
+            isStandard ??= IsStandard;
+            if (!string.IsNullOrEmpty(paymentMethod)) return Accounts.GetSales(paymentMethod, isStandard: (bool)isStandard);
+            return Accounts.GetSales(countryIso, isStandard: (bool)isStandard);
+        }
+
+        /// <summary>
+        /// <returns>
+        /// Returns either Reduced or Standard VAT Account
+        /// Always returns the highest TAX Rate of the order, assuming that reduced VAT <= standard VAT.
+        /// If NO items in order has reduced rate, the order is considered Standard rate.
+        /// </returns>
+        /// </summary>
+        public RateModel GetVatAcc(bool? isStandard = null, string paymentMethod = null, string countryIso = null)
+        {
+            isStandard ??= IsStandard;
+            if (!string.IsNullOrEmpty(paymentMethod)) return Accounts.GetVAT(paymentMethod, isStandard: (bool)isStandard);
+            return Accounts.GetVAT(countryIso, isStandard: (bool)isStandard);
+        }
+
+        public bool HasShippingCost;
+        public bool IsStandard;
+        public bool IsReduced;
+        public bool HasDiscounts;
+
+        public decimal CurrencyRate;
+        public decimal Total;
+        public decimal ShippingSEK;
+        public decimal ShippingVatSEK;
+        public decimal ShippingTotalSEK => ShippingSEK + ShippingVatSEK;
+
+        public decimal CartTaxSEK { get; internal set; }
+        public decimal ItemsTaxSEK { get; internal set; }
+
+        public decimal TotalSEK;
+        public string PaymentMethod;
+        public bool IsInEu;
+    }
+
     public static class VerificationUtils
     {
         private static readonly List<string> EUCountries = new List<string>()
@@ -59,19 +137,26 @@ namespace Findus.Helpers
         {
             var payment = order.payment_method.ToLower();
 
-            // NOTE: Catch-all: stripe & stripe_{bancontant,ideal}
-            return new Regex(@"^stripe\S*").IsMatch(payment)
-                ? "Stripe"
-                : payment switch
-                {
-                    "paypal" => "PayPal",
-                    _ => throw new Exception(String.Format(
-                         "Payment Method: '{0}' unexpected." + Environment.NewLine +
-                         "Payment Method Title: {1}",
-                         order.payment_method,
-                         order.payment_method_title)
-                     ),
-                };
+            if (string.IsNullOrEmpty(payment)/*  && !IsInsideEU(order.billing.country) */)
+            {
+                throw new Exception("Beställningen behöver bokföras manuellt.");
+            }
+
+            // NOTE: Catch-all: stripe & stripe_{bancontant,ideal,sofort}
+            if (new Regex(@"^stripe\S*").IsMatch(payment)) return "Stripe";
+            // NOTE: Catch-all: paypal & (ppec_paypal)_paypal 
+            if (new Regex(@"^\S*paypal$").IsMatch(payment)) return "PayPal";
+
+            return payment switch
+            {
+                "paypal" => "PayPal",
+                _ => throw new Exception(String.Format(
+                     "Payment Method: '{0}' unexpected." + Environment.NewLine +
+                     "Payment Method Title: {1}",
+                     order.payment_method,
+                     order.payment_method_title)
+                 ),
+            };
         }
 
         public static bool OnlyReducedRate(List<OrderLineItem> line_items)
@@ -127,54 +212,75 @@ namespace Findus.Helpers
             return coupon.code;
         }
 
-        public static bool HasFreeShaker(this WcOrder order) => order.coupon_lines.Any(coupon => coupon.code == "freeshaker");
-
-        public static decimal GetAccurateTotal(this WcOrder order)
+        public static decimal GetAccurateCartTax(this WcOrder order)
         {
-            decimal total = (decimal)order.line_items.Sum(i => (i.price * i.quantity) + i.taxes.Sum(t => t.total));
-            float diff = MathF.Abs((float)(total - (decimal)(order.total - order.shipping_total)));
+            decimal total = (decimal)order.line_items.Sum(i => i.taxes.Sum(t => t.total));
+            //total += (decimal)(order.shipping_total + order.shipping_tax);
 
+            var diff = MathF.Abs((float)(total - order.cart_tax));
             // Should not deviate more than 0.01 from WooCommerce total cost
-            if (diff > 0.01)
+            if (diff >= 0.01)
             {
                 throw new Exception(
-                    string.Format("WooCommerce order total does not match calculated total. Difference: {0}, {1} = {2:0.000}",
-                        total,
-                        order.total,
-                        diff
-                ));
+                    $"WooCommerce order cart tax does not match calculated cart tax. Difference: {total}, {order.cart_tax} = {diff:0.000}");
             }
             return total;
         }
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null)
+        public static decimal GetAccurateTax(this OrderLineItem item) => (decimal)item.taxes.Sum(t => t.total) / item.quantity ?? 1;
+        public static decimal GetAccurateTotal(this WcOrder order)
         {
-            var VATAccount = accounts.GetVATAccount(order);
-            var SalesAccount = accounts.GetSalesAccount(order);
+            decimal total = (decimal)order.line_items.Sum(i => (i.price * i.quantity) + i.taxes.Sum(t => t.total));
+            total += (decimal)(order.shipping_total + order.shipping_tax);
+
+            var diff = MathF.Abs((float)(total - order.total));
+            // Should not deviate more than 0.01 from WooCommerce total cost
+            if (diff > 0.01)
+            {
+                throw new Exception(
+                    $"WooCommerce order total does not match calculated total. Difference: {total}, {order.total} = {diff:0.000}");
+            }
+            return total;
+        }
+
+        public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTax());
+
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false)
+        {
+            var vatAccount = accounts.GetVATAccount(order);
+            var salesAccount = accounts.GetSalesAccount(order);
 
             var countryIso = order.billing.country;
 
-            bool isInEu = VerificationUtils.IsInsideEU(countryIso);
-            bool isStandard = VerificationUtils.ContainsNoReducedRate(order.line_items);
+            bool isInEu = IsInsideEU(countryIso);
+            bool isStandard = ContainsNoReducedRate(order.line_items);
             bool isReduced = !isStandard;
             bool hasShippingCost = order.shipping_lines.Count > 0 && order.shipping_total > 0;
 
             if (order.fee_lines != null && order.fee_lines.Count != 0)
                 throw new Exception("WooCommerce order contains unexpected 'fee_lines'");
-            if (order.discount_total != null && order.discount_total != 0.0M)
-                throw new Exception("WooCommerce order contains unexpected 'discount_total'");
 
+            bool hasDiscounts = false;
             foreach (var coupon in order.coupon_lines)
             {
-                VerifyCoupon(coupon);
-                _ = coupon.code switch
+                hasDiscounts = VerifyCoupon(coupon) switch
                 {
-                    "freeshaker" => true,
+                    "freeshaker" => false,
+                    "gb10" => true,
                     _ => throw new Exception($"WooCommerce order contains unexpected discount code: {coupon.code}"),
                 };
             }
 
+            if (!hasDiscounts && order.discount_total != null && order.discount_total != 0.0M)
+                throw new Exception("WooCommerce order contains unexpected 'discount_total'");
+
             decimal total = accurateTotal ?? order.GetAccurateTotal();
+
+            decimal totalCartTax = order.GetAccurateCartTax();
+            decimal cartTaxSEK = totalCartTax * currencyRate;
+
+            decimal itemsTax = order.GetTotalItemsTax();
+            decimal itemsTaxSEK = itemsTax * currencyRate;
 
             decimal shippingSEK = (decimal)order.shipping_total * currencyRate;
             decimal shippingVatSEK = (decimal)order.shipping_tax * currencyRate;
@@ -182,155 +288,298 @@ namespace Findus.Helpers
 
             var paymentMethod = GetPaymentMethod(order);
 
+            var invAccrualData = new InvoiceAccrualData
+            {
+                Order = order,
+                CountryIso = countryIso,
+                IsInEu = isInEu,
+                IsReduced = isReduced,
+                IsStandard = isStandard,
+                HasShippingCost = hasShippingCost,
+
+                Accounts = accounts,
+                SalesAcc = salesAccount,
+                VatAcc = vatAccount,
+
+                CurrencyRate = currencyRate,
+                Total = total,
+                CartTaxSEK = cartTaxSEK,
+                ItemsTaxSEK = itemsTaxSEK,
+                ShippingSEK = shippingSEK,
+                ShippingVatSEK = shippingVatSEK,
+                TotalSEK = totalSEK,
+
+                PaymentMethod = paymentMethod,
+            };
+
+            var inv = GenInvoiceAccrual(invAccrualData);
+            if(simplify) {
+                inv.TrySymplify();
+            }
+            return inv
+                //.TryAddCartTax(invAccrualData)
+                .TryVerifyRows()
+                .AddPaymentFee(invAccrualData);
+            /*
+            var inv = GenInvoiceAccrual(invAccrualData);
+            try {
+                return inv.TryVerifyRows();
+            } catch (Exception ex) {
+                Console.WriteLine(ex.Message);
+                return inv;
+            }
+            */
+        }
+
+        public static decimal GetTotal(this IEnumerable<InvoiceAccrualRow> rows)
+        {
+            return rows.Sum(r =>
+            {
+                if (r.Credit > 0.0M && r.Debit > 0.0M)
+                {
+                    throw new Exception("Invoice Accrual Row cannot contain both Credit and Debit");
+                }
+                return r.Credit + r.Debit;
+            }) ?? 0.0M;
+        }
+        public static InvoiceAccrual TryVerifyRows(this InvoiceAccrual inv)
+        {
+            var creditRows = inv.InvoiceAccrualRows.Where(r => r.Debit == null || r.Debit == 0.0M);
+            var debitRows = inv.InvoiceAccrualRows.Where(r => r.Credit == null || r.Credit == 0.0M);
+
+            var creditTotal = creditRows.GetTotal();
+
+            creditRows = creditRows.GroupBy(r => r.Account).Select(g => new InvoiceAccrualRow
+            {
+                Account = g.Key,
+                Debit = 0,
+                Credit = g.Sum(r => r.Credit),
+                TransactionInformation = g.FirstOrDefault().TransactionInformation
+            });
+
+            var sumOfRows = creditRows.GetTotal();
+            decimal diff = (decimal)MathF.Abs((float)(sumOfRows - creditTotal));
+            decimal EPSILON = new decimal(1, 0, 0, false, 25); //1e-25m;
+            if (diff > EPSILON)
+            {
+                throw new Exception($"Total Credit(s) does not match expected Credit(s) in SEK, Expected: {creditTotal}, got {sumOfRows}, Difference: {MathF.Abs((float)(creditTotal - sumOfRows))}");
+            }
+            var debitTotal = debitRows.GetTotal();
+            diff = (decimal)MathF.Abs((float)(creditTotal - debitTotal));
+            if (diff >= 0.01M)
+            {
+                throw new Exception($"Total Debit does not match Credit(s) in SEK, Credit: {creditTotal}, Debit: {debitTotal}, Difference: {diff}");
+            }
+
+            return inv;
+        }
+
+        private static decimal? GetTotalCredit(this IEnumerable<InvoiceAccrualRow> rows) {
+            return rows.Where(r => r.Credit != 0).Sum(r => r.Credit);
+        }
+        private static decimal? GetTotalDebit(this IEnumerable<InvoiceAccrualRow> rows) {
+            return rows.Where(r => r.Debit != 0).Sum(r => r.Debit);
+        }
+        private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows) {
+            if(rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0) {
+                throw new Exception("Cannot Concatenate Invoice Accrual Rows than contain both Debit and Credit.");
+            }
+            return rows.GroupBy(r => r.Account).Select(g => new InvoiceAccrualRow
+            {
+                Account = g.Key,
+                Debit = g.Sum(r => r.Debit),
+                Credit = g.Sum(r => r.Credit),
+                TransactionInformation = g.FirstOrDefault().TransactionInformation
+            });
+        }
+
+        public static InvoiceAccrual TrySymplify(this InvoiceAccrual inv)
+        {
+            var creditRows = inv.InvoiceAccrualRows.Where(r => r.Credit != 0.0M);
+            var debitRows = inv.InvoiceAccrualRows.Where(r => r.Debit != 0.0M);
+
+            creditRows = creditRows.TrySimplify();
+            debitRows = debitRows.TrySimplify();
+
+            inv.InvoiceAccrualRows = debitRows.Concat(creditRows).ToList();
+
+            return inv;
+        }
+
+        public static InvoiceAccrual TryAddCartTax(this InvoiceAccrual invoice, InvoiceAccrualData data)
+        {
+            if (data.CartTaxSEK > 0.0M)
+            {
+                var vatAcc = data.GetVatAcc(countryIso: data.CountryIso);
+                invoice.AddRow(
+                    vatAcc.AccountNr,
+                    credit: data.CartTaxSEK,
+                    info: $"Cart Tax"
+                );
+            }
+            return invoice;
+        }
+
+        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, InvoiceAccrualData data)
+        {
+            return invoice.AddPaymentFee(data.Order, data.GetSalesAcc(isStandard: true, paymentMethod: data.PaymentMethod), data.PaymentMethod);
+        }
+        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, WcOrder order, RateModel salesAccount, string paymentMethod = null)
+        {
+            paymentMethod = paymentMethod ??= GetPaymentMethod(order);
+            decimal fee = paymentMethod switch
+            {
+                "Stripe" => decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_fee").value),
+                "PayPal" => decimal.Parse((string)order.meta_data.First(d => d.key == "_paypal_transaction_fee").value),
+                _ => 0.0M
+            };
+            if (fee <= 0.0M || fee >= (decimal)order.total)
+            {
+                throw new Exception($"Unexpected Fee amount: {fee} ,({paymentMethod})");
+            }
+            invoice.AddRow(salesAccount.AccountNr, credit: fee, info: $"{paymentMethod} Avgift - Utgående");
+            invoice.AddRow(6570, debit: fee, info: $"{paymentMethod} Avgift");
+            return invoice;
+        }
+
+        private static InvoiceAccrual GenInvoiceAccrual(InvoiceAccrualData data)
+        {
             var inv = new InvoiceAccrual()
             {
                 InvoiceAccrualRows = new List<InvoiceAccrualRow>()
             };
-
-            if (isInEu)
+            if (data.IsInEu)
             {
-                var salesAccNr = accounts.GetSales(paymentMethod, isStandard).AccountNr;
+                var salesAccNr = data.GetSalesAcc(paymentMethod: data.PaymentMethod).AccountNr;
                 inv.AddRow(
                     salesAccNr,
-                    debit: totalSEK + shippingSEK,
-                    info: paymentMethod
+                    debit: data.TotalSEK,
+                    info: data.PaymentMethod
                 );
-
-                if (hasShippingCost)
+                if (data.HasShippingCost)
                 {
-                    var vatAcc = accounts.GetVAT(paymentMethod, isStandard);
-                    var vatAccNr = vatAcc.AccountNr;
-                    var taxLabel = VerifyRate(vatAcc, order, isReduced: isReduced);
+                    var vatAcc = data.GetVatAcc(countryIso: data.CountryIso);
+                    var taxLabel = data.GetTaxLabel(vatAcc);
                     inv.AddRow(
-                        vatAccNr,
-                        credit: (decimal)(order.shipping_total - order.shipping_tax) * currencyRate,
-                        info: "Fraktkostnad"
-                    );
-                    inv.AddRow(
-                        vatAccNr,
-                        credit: (decimal)order.shipping_tax * currencyRate,
-                        info: $"Fraktkostnad VAT {taxLabel}"
+                        vatAcc.AccountNr,
+                        credit: data.ShippingTotalSEK,
+                        info: $"Fraktkostnad med Moms - {taxLabel}"
                     );
                 }
-                foreach (var item in order.line_items.OrderByDescending(i => i.price))
-                {
-                    if (item.tax_class == "reduced-rate")
-                    {
-                        var acc = SalesAccount.Reduced;
-                        var taxLabel = VerifyRate(acc, order, item: item);
 
-                        inv.AddRow(
-                                acc.AccountNr,
-                                credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Försäljning - {taxLabel}"
-                            );
-                        if (item.subtotal_tax > 0.0M)
-                        {
-                            acc = VATAccount.Reduced;
-                            inv.AddRow(
-                                acc.AccountNr,
-                                credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Utgående Moms - {taxLabel}"
-                        );
-                        }
-                    }
-                    else
-                    {
-                        var acc = SalesAccount.Standard;
-                        var taxLabel = VerifyRate(acc, order, item: item);
-                        inv.AddRow(
-                            acc.AccountNr,
-                            credit: (decimal)(item.price * item.quantity) * currencyRate, // * (decimal)acc.Rate
-                            info: $"Försäljning - {taxLabel}"
+                foreach (var item in data.Items())
+                {
+                    if (item.price == 0.0M && item.subtotal_tax == 0.0M) continue;
+                    var isStandard = item.tax_class != "reduced-rate";
+                    var salesAcc = data.GetSalesAcc(isStandard, countryIso: data.CountryIso);
+                    var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
+                    inv.AddRow(
+                        salesAcc.AccountNr,
+                        credit: (decimal)(item.price * item.quantity) * data.CurrencyRate,
+                        info: $"Försäljning - {taxLabel}"
                     );
-                        if (item.subtotal_tax > 0.0M)
+                    if (item.subtotal_tax > 0.0M)
+                    {
+                        var vatAcc = data.GetVatAcc(isStandard, countryIso: data.CountryIso);
+                        taxLabel = data.GetTaxLabel(vatAcc, isStandard: isStandard);
+
+                        var accurateTax = item.GetAccurateTax();
+
+                        var diff = MathF.Abs((float)(accurateTax - (item.price * vatAcc.Rate)));
+                        // Should not deviate more than 0.01 from WooCommerce subtotal_tax 
+                        if (diff >= 0.01)
                         {
-                            acc = VATAccount.Standard;
-                            inv.AddRow(
-                                acc.AccountNr,
-                                credit: (decimal)(item.subtotal_tax) * currencyRate, // * (decimal)acc.Rate
-                                info: $"Utgående Moms - {taxLabel}"
-                        );
+                            throw new Exception(
+                                $"WooCommerce order tax does not match calculated {taxLabel}. Difference: {item.subtotal_tax}, {item.price * vatAcc.Rate} = {diff:0.000}");
                         }
+                        //var itemCost = ((decimal)item.price + accurateTax) * vatAcc.Rate;
+                        /* Added Vat sales to first debit row, see ItemsTaxSEK */
+                        /*
+                        inv.AddRow(
+                            salesAccNr,
+                            debit: accurateTax * data.CurrencyRate,
+                            info: $"Moms - {taxLabel}"
+                        );*/
+                        inv.AddRow(
+                            vatAcc.AccountNr,
+                            credit: accurateTax * data.CurrencyRate,
+                            info: $"Utgående Moms - {taxLabel}"
+                        );
                     }
                 }
             }
             else
             {
-                var vatAcc = VATAccount.Standard;
-                var salesAcc = SalesAccount.Standard;
-                if (vatAcc.Rate + salesAcc.Rate > 0.0M)
+                if (!data.TotalStandardRateEquals(0.0M))
                 {
-                    throw new Exception("Expected Rate to be 0.0% for countries outside EU.");
+                    throw new Exception("Expected Rate to be 0% for countries outside EU.");
                 }
+                var salesAcc = data.GetSalesAcc(paymentMethod: data.PaymentMethod);
                 inv.AddRow(
-                                salesAcc.AccountNr,
-                                debit: totalSEK + shippingSEK,
-                                info: paymentMethod
-                        );
+                    salesAcc.AccountNr,
+                    debit: data.TotalSEK + data.ShippingSEK,
+                    info: data.PaymentMethod
+                );
+
+                var vatAcc = data.GetVatAcc(countryIso: data.CountryIso);
                 inv.AddRow(
-                                vatAcc.AccountNr,
-                                credit: totalSEK,
-                                info: $"Utanför EU - Moms - {0.0:P2}"
-                        );
-                if (hasShippingCost)
+                    vatAcc.AccountNr,
+                    credit: data.TotalSEK,
+                    info: $"Utanför EU - Moms - {0.0:P2}"
+                );
+
+                if (data.HasShippingCost)
                 {
-                    if (isReduced) vatAcc = accounts.GetVATAccount(paymentMethod).Reduced;
+                    vatAcc = data.GetVatAcc(countryIso: data.CountryIso);
                     inv.AddRow(
-                            vatAcc.AccountNr,
-                            credit: shippingSEK,
-                            info: "Fraktkostnad"
+                        vatAcc.AccountNr,
+                        credit: data.ShippingSEK,
+                        info: "Fraktkostnad"
                     );
                 }
             }
 
-            return inv.AddPaymentFee(order, SalesAccount, paymentMethod);
+            return inv;
         }
 
-        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, WcOrder order, AccountModel salesAccount, string paymentMethod = null)
+        public static decimal GetTaxRate(this OrderTaxLine taxLine)
         {
-            if (string.IsNullOrEmpty(paymentMethod))
-            {
-                paymentMethod = GetPaymentMethod(order);
-            }
-            decimal fee = paymentMethod switch
-            {
-                "Stripe" => decimal.Parse((string)order.meta_data.First(d => d.key == "_stripe_fee").value),
-                "PayPal" => throw new NotImplementedException(),
-                _ => 0.0M
-            };
-            if (fee > 0.0M)
-            {
-                invoice.AddRow(salesAccount.Standard.AccountNr, credit: fee, info: $"{paymentMethod} Avgift");
-                invoice.AddRow(6570, debit: fee, info: $"{paymentMethod} Avgift");
-            }
-            return invoice;
+            var taxLabel = taxLine.label;
+            return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
         }
-
-        private static string VerifyRate(RateModel acc, WcOrder order, OrderLineItem item = null, bool? isReduced = null)
+        public static string VerifyRate(RateModel acc, WcOrder order, OrderLineItem item = null, bool? isStandard = null)
         {
             if (item != null)
             {
-                isReduced = item.tax_class == "reduced-rate";
+                isStandard = item.tax_class != "reduced-rate";
             }
-            else if (isReduced == null)
+            else if (isStandard == null)
             {
                 throw new ArgumentNullException();
             }
 
+            /*
             var taxLine = order.tax_lines[
-                isReduced == true
+                isStandard != true
                 ? 0
                 : 1];
 
             string taxLabel = taxLine.label;
 
             decimal wcTax = decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
+            */
+            var taxRates = order.tax_lines.Select(t => t.GetTaxRate()).OrderByDescending(t => t);
+            decimal wcTax = isStandard switch
+            {
+                true => taxRates.FirstOrDefault(),
+                false => taxRates.LastOrDefault(),
+            };
+
             if (acc.Rate != wcTax)
             {
-                throw new Exception($"VAT Rate miss-match, expected value: {acc.Rate:P2} VAT, but WooCommerce gave: {taxLabel}");
+                throw new Exception($"VAT Rate miss-match, expected value: {acc.Rate:P2} VAT, but WooCommerce gave: {wcTax:P2} VAT");
             }
-            return taxLabel;
+            return $"{wcTax:P2} VAT";
         }
     }
 }
