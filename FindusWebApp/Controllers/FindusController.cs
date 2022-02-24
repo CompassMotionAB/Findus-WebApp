@@ -16,9 +16,29 @@ using Microsoft.Extensions.Caching.Memory;
 using System.Globalization;
 using FindusWebApp.Helpers;
 using Microsoft.Extensions.Options;
+using Fortnox.SDK.Entities;
 
 namespace FindusWebApp.Controllers
 {
+    public class VerificationResult
+    {
+        public InvoiceAccrual InvoiceAccrual;
+        public Invoice Invoice;
+
+        public string ErrorMessage;
+
+        public VerificationResult(string errorMessage)
+        {
+            ErrorMessage = errorMessage;
+        }
+
+        public VerificationResult(InvoiceAccrual invoiceAccrual, Invoice invoice, string errorMessage = null)
+        {
+            InvoiceAccrual = invoiceAccrual;
+            Invoice = invoice;
+            ErrorMessage = errorMessage;
+        }
+    }
     public class FindusController : Controller
     {
         private readonly WooKeys _wcKeys;
@@ -109,7 +129,32 @@ namespace FindusWebApp.Controllers
             return await CurrencyUtils.GetSEKCurrencyRateAsync(date, order.currency.ToUpper(), httpClient);
         }
 
-        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = false)
+        private async Task<Dictionary<ulong, VerificationResult>> VerifyOrders(OrderRouteModel orderRoute, bool simplify = true)
+        {
+            var result = new Dictionary<ulong, VerificationResult>();
+            var orders = await Get(orderRoute);
+            _orderViewModel = new OrderViewModel(orders, orderRoute);
+            foreach (var order in orders)
+            {
+                try
+                {
+                    decimal accurateTotal = order.GetAccurateTotal();
+                    decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
+                    var invoice = VerificationUtils.GenInvoice(order, currencyRate);
+                    var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify);
+
+                    result.Add((ulong)order.id, new VerificationResult(invoiceAccrual, invoice));
+                }
+                catch (Exception ex)
+                {
+                    result.Add((ulong)order.id, new VerificationResult(errorMessage: ex.Message));
+                }
+            }
+
+            return result;
+        }
+
+        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = true)
         {
             try
             {
@@ -117,7 +162,6 @@ namespace FindusWebApp.Controllers
                 WcOrder order = _orderViewModel.GetOrder();
 
                 decimal accurateTotal = order.GetAccurateTotal();
-
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
 
                 var invoice = VerificationUtils.GenInvoice(order, currencyRate);
@@ -135,11 +179,13 @@ namespace FindusWebApp.Controllers
 
         [HttpGet]
         [Route("api/orders/verify")]
-        public async Task<bool> VerifyOrderBool(ulong? orderId, string dateFrom = null, string dateTo = null) {
+        public async Task<bool> VerifyOrderBool(ulong? orderId, string dateFrom = null, string dateTo = null)
+        {
             return await VerifyOrderBool(new OrderRouteModel(orderId, dateFrom, dateTo));
         }
 
-        private async Task<bool> VerifyOrderBool(OrderRouteModel orderRoute) {
+        private async Task<bool> VerifyOrderBool(OrderRouteModel orderRoute)
+        {
             var order = (await Get(orderRoute)).FirstOrDefault();
             return await VerifyOrderBool(order);
         }
@@ -149,12 +195,15 @@ namespace FindusWebApp.Controllers
             Fortnox.SDK.Entities.InvoiceAccrual invoiceAccrual;
             Fortnox.SDK.Entities.Invoice invoice;
 
-            try {
+            try
+            {
                 decimal accurateTotal = order.GetAccurateTotal();
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
                 invoice = VerificationUtils.GenInvoice(order, currencyRate);
                 invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal);
-            } catch( Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 ViewBag.Error = ex.Message;
                 return false;
             }
@@ -207,12 +256,23 @@ namespace FindusWebApp.Controllers
             return orders;
         }
 
-        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = false)
+        public async Task<IActionResult> VerificationBatch(string dateFrom = null, string dateTo = null)
         {
-            if (_wcOrderApi == null)
+            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
+            try
             {
-                return RedirectToAction("Index");
+                ViewData["VerificationData"] = await VerifyOrders(orderRoute);
             }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            return View("Findus");
+        }
+
+        public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = true)
+        {
+            /* if (_wcOrderApi == null) { return RedirectToAction("Index"); } */
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             var orders = await Get(orderRoute);
             return await VerifyOrder(orders, orderRoute, simplify);

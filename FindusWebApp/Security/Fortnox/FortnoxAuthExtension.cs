@@ -21,8 +21,8 @@ namespace FindusWebApp.Security.Fortnox
             OAuth2Keys auth2keys = configuration.GetSection(OAuth2Keys.Name).Get<OAuth2Keys>();
 
             var baseUrl = _fortnoxSettings.BaseUrl;
-            var authEndpoint = new Uri(_fortnoxSettings.AuthEndpoint);
-            var tokenEndpoint = new Uri(_fortnoxSettings.TokenEndpoint);
+            var authEndpoint = _fortnoxSettings.AuthEndpoint;
+            var tokenEndpoint = _fortnoxSettings.TokenEndpoint;
 
             if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(authEndpoint.ToString()) || string.IsNullOrEmpty(tokenEndpoint.ToString()))
             {
@@ -38,7 +38,6 @@ namespace FindusWebApp.Security.Fortnox
             var clientId = auth2keys.ClientId;
             var clientSecret = auth2keys.ClientSecret;
             var callbackPath = auth2keys.CallbackPath;
-            var relativePath = PathString.FromUriComponent(new Uri(callbackPath));
 
             if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
             {
@@ -62,11 +61,11 @@ namespace FindusWebApp.Security.Fortnox
                 //options.Cookie.HttpOnly = true;
             }).AddOAuth(Constants.FortnoxScheme, options =>
             {
-                options.AuthorizationEndpoint = baseUrl + PathString.FromUriComponent(authEndpoint);
-                options.TokenEndpoint = baseUrl + PathString.FromUriComponent(tokenEndpoint);
+                options.AuthorizationEndpoint = baseUrl + authEndpoint;
+                options.TokenEndpoint = baseUrl + tokenEndpoint;
                 options.ClientId = clientId;
                 options.ClientSecret = clientSecret;
-                options.CallbackPath = relativePath;
+                options.CallbackPath = callbackPath;
                 options.SaveTokens = true;
 
                 options.SignInScheme = "Cookies";
