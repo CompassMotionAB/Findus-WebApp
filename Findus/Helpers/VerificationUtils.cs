@@ -89,7 +89,7 @@ namespace Findus.Helpers
 
     public static class VerificationUtils
     {
-        private static readonly List<string> EUCountries = new List<string>()
+        private static readonly List<string> EUCountries = new()
         {
             "ES",
             "BG",
@@ -359,7 +359,7 @@ namespace Findus.Helpers
 
             var sumOfRows = creditRows.GetTotal();
             decimal diff = (decimal)MathF.Abs((float)(sumOfRows - creditTotal));
-            decimal EPSILON = new decimal(1, 0, 0, false, 25); //1e-25m;
+            var EPSILON = new decimal(1, 0, 0, false, 25); //1e-25m;
             if (diff > EPSILON)
             {
                 throw new Exception($"Total Credit(s) does not match expected Credit(s) in SEK, Expected: {creditTotal}, got {sumOfRows}, Difference: {MathF.Abs((float)(creditTotal - sumOfRows))}");
@@ -414,7 +414,7 @@ namespace Findus.Helpers
                 invoice.AddRow(
                     vatAcc.AccountNr,
                     credit: data.CartTaxSEK,
-                    info: $"Cart Tax"
+                    info: "Cart Tax"
                 );
             }
             return invoice;
@@ -555,19 +555,9 @@ namespace Findus.Helpers
             }
             else if (isStandard == null)
             {
-                throw new ArgumentNullException();
+                throw new ArgumentNullException(paramName: nameof(isStandard), message: $"Expected {nameof(isStandard)} to be provided when {nameof(item)} == null");
             }
 
-            /*
-            var taxLine = order.tax_lines[
-                isStandard != true
-                ? 0
-                : 1];
-
-            string taxLabel = taxLine.label;
-
-            decimal wcTax = decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
-            */
             var taxRates = order.tax_lines.Select(t => t.GetTaxRate()).OrderByDescending(t => t);
             decimal wcTax = isStandard switch
             {

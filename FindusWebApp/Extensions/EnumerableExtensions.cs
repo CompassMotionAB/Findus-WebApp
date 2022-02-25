@@ -21,7 +21,7 @@ namespace FindusWebApp.Extensions
             {
                 return "";
             }
-            StringBuilder sb = new StringBuilder();
+            var sb = new StringBuilder();
             sb.Append(iterator.Current);
             while (iterator.MoveNext())
             {
@@ -37,7 +37,7 @@ namespace FindusWebApp.Extensions
 		/// for an array is unique even if the contents are the same.
 		/// </summary>
 		/// <remarks>
-		/// See Jon Skeet (C# MVP) response in the StackOverflow thread 
+		/// See Jon Skeet (C# MVP) response in the StackOverflow thread
 		/// http://stackoverflow.com/questions/263400/what-is-the-best-algorithm-for-an-overridden-system-object-gethashcode
 		/// </remarks>
 		/// <param name="array">The array to generate a hash code for.</param>

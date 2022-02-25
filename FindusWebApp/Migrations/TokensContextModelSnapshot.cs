@@ -32,7 +32,6 @@ namespace FindusWebApp.Migrations
                     .IsRequired()
                     .HasColumnType("TEXT")
                     .HasMaxLength(1000);
-               
                 b.HasKey("RealmId");
 
                 b.ToTable("Token");

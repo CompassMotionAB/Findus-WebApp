@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace FindusWebApp.Extensions
 {
-
     public static class HttpContextExtensions
     {
         public static string GenerateFullDomain(this HttpContext httpContext, string uri = null)

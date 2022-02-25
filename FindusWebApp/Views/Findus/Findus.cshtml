@@ -1,5 +1,6 @@
 @model FindusWebApp.Models.OrderViewModel
 @using System.Collections.Generic
+@using WcOrder = WooCommerceNET.WooCommerce.v2.Order
 
 @{
     //var Order = TempData["order"] as WooCommerceNET.WooCommerce.v2.Order;
@@ -12,7 +13,6 @@
     bool OnlyWc = Invoice == null && InvoiceAccrual == null;
     bool Verification = !OnlyWc;
 
-    //var VerificationData = TempData["VerificationData"] as Dictionary<ulong, VerificationResult>;
 }
 
 @if (ViewBag.Error != null)
@@ -49,6 +49,7 @@
     {
         @Html.DisplayFor(m=> @Order)
     }
+
 </div>
 @if (!OnlyWc)
 {

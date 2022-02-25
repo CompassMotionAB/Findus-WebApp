@@ -17,7 +17,7 @@ namespace FindusWebApp.Services.Fortnox
     public class FortnoxContext : IActionFilter, IFortnoxContext
     {
         public FortnoxClient Client => GetFortnoxClient();
-        public FortnoxClient GetFortnoxClient() => new FortnoxClient(new StandardAuth(GetAccessToken()));
+        public FortnoxClient GetFortnoxClient() => new(new StandardAuth(GetAccessToken()));
         private readonly Token _token;
         public string CustomerNr;
 

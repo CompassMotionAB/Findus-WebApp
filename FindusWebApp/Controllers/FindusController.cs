@@ -64,7 +64,7 @@ namespace FindusWebApp.Controllers
             }
             else
             {
-                RestAPI restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
+                var restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
                 _wcOrderApi = new WCObject.WCOrderItem(restJwt);
             }
             _accounts = new AccountsModel(
