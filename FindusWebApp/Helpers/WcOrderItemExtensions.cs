@@ -74,7 +74,7 @@ namespace FindusWebApp.Helpers
         {
             if (orderId == null)
             {
-                throw new ArgumentNullException();
+                throw new ArgumentNullException(paramName: nameof(orderId));
             }
             return await wcOrderApi.Get((int)orderId);
         }

@@ -24,7 +24,7 @@ namespace FindusWebApp.Security.Fortnox
             var authEndpoint = _fortnoxSettings.AuthEndpoint;
             var tokenEndpoint = _fortnoxSettings.TokenEndpoint;
 
-            if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(authEndpoint.ToString()) || string.IsNullOrEmpty(tokenEndpoint.ToString()))
+            if (string.IsNullOrEmpty(baseUrl) || string.IsNullOrEmpty(authEndpoint) || string.IsNullOrEmpty(tokenEndpoint))
             {
                 throw new System.Exception("Fortnox Endpoints's and BaseUrl must be configured for Fortnox authentication. See ./appsettings.sample.json");
             }
@@ -54,7 +54,7 @@ namespace FindusWebApp.Security.Fortnox
                 options.DefaultAuthenticateScheme = Constants.FortnoxScheme;
                 options.DefaultChallengeScheme = Constants.FortnoxScheme;
             })
-            .AddCookie(o =>
+            .AddCookie(_ =>
             {
                 //options.Cookie.SecurePolicy = CookieSecurePolicy.Never;
                 //options.Cookie.SameSite = SameSiteMode.Strict;

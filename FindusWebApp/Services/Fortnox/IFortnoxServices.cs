@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace FindusWebApp.Services.Fortnox
 {
-    public interface IFortnoxContext 
+    public interface IFortnoxContext
     {
         string GetAccessToken();
         string GetRefreshToken();

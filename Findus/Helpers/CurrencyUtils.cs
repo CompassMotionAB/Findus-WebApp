@@ -49,6 +49,5 @@ namespace Findus.Helpers
 
             return decimal.Parse(currencyRate);
         }
-
     }
 }
