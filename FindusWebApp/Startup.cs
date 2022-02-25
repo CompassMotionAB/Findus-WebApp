@@ -62,7 +62,8 @@ namespace FindusWebApp
 
             services.AddFortnoxAuthorization(Configuration);
 
-            services.AddDbContext<TokensContext>(options => options.UseSqlite(Configuration.GetConnectionString("DBConnectionString")));
+            //services.AddDbContext<TokensContext>(options => options.UseSqlite(Configuration.GetConnectionString("DBConnectionString")));
+            services.AddDbContext<TokensContext>(options => options.UseSqlServer(Configuration.GetConnectionString("SQLServerConnectionString")));
 
             services.AddTransient<IFortnoxServices, FortnoxServices>();
 
