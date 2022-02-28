@@ -27,7 +27,7 @@ env:
 on:
   push:
     branches:
-      - joaqim-azure-deploy-1
+      - main
   workflow_dispatch:
 
 jobs:
