@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="web.config"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Include="wwwroot\images\C2FNK_white_btn_lg_default.png" />
     <None Update="SalesAccounts.json"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Update="VATAccounts.json">
