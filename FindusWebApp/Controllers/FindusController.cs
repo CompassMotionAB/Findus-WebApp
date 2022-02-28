@@ -47,6 +47,7 @@ namespace FindusWebApp.Controllers
         private readonly IMemoryCache _memoryCache;
         private readonly MemoryCacheEntryOptions _orderCacheOptions;
         private readonly AccountsModel _accounts;
+        private readonly dynamic _coupons;
         private OrderViewModel _orderViewModel;
 
         public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions)
@@ -71,6 +72,7 @@ namespace FindusWebApp.Controllers
                     JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
                     JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
                 );
+            _coupons = JsonUtilities.LoadJson<dynamic>("Coupons.json");
 
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
@@ -145,7 +147,7 @@ namespace FindusWebApp.Controllers
                     decimal accurateTotal = order.GetAccurateTotal();
                     decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
                     var invoice = VerificationUtils.GenInvoice(order, currencyRate);
-                    var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify);
+                    var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify, coupons: _coupons);
 
                     result.Add((ulong)order.id, new VerificationResult(invoiceAccrual, invoice));
                 }
@@ -169,7 +171,7 @@ namespace FindusWebApp.Controllers
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
 
                 var invoice = VerificationUtils.GenInvoice(order, currencyRate);
-                var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify);
+                var invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify, coupons: _coupons);
 
                 TempData["Invoice"] = invoice;
                 TempData["InvoiceAccrual"] = invoiceAccrual;
@@ -204,7 +206,7 @@ namespace FindusWebApp.Controllers
                 decimal accurateTotal = order.GetAccurateTotal();
                 decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
                 invoice = VerificationUtils.GenInvoice(order, currencyRate);
-                invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal);
+                invoiceAccrual = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, coupons: _coupons);
             }
             catch (Exception ex)
             {
