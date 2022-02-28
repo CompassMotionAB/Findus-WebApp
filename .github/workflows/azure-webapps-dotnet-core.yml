@@ -59,6 +59,14 @@ jobs:
       - name: Copy appsettings.sample.json to appsettings.json
         run: cp -n ${{env.DOTNET_ROOT}}/myapp/appsettings.sample.json ${{ env.DOTNET_ROOT }}/myapp/appsettings.json
       
+      - name: Create Coupons.json
+        id: create-json-1
+        uses: jsdaniell/create-json@1.1.2
+        with:
+          name: "Coupons.json"
+          json: ${{ secrets.COUPONS_JSON_RAW }}
+          dir: '${{env.DOTNET_ROOT}}/myapp/'
+      
       - name: App Settings Variable Substitution
         uses: microsoft/variable-substitution@v1
         with:

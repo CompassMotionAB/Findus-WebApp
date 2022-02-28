@@ -197,7 +197,7 @@ namespace Findus.Helpers
             };
         }
 
-        private static string VerifyCoupon(OrderCouponLine coupon)
+        private static bool VerifyCoupon(OrderCouponLine coupon, dynamic coupons)
         {
             if ((coupon.discount != null && coupon.discount != 0.0M) || (coupon.discount_tax != null && coupon.discount_tax != 0.0M))
             {
@@ -208,8 +208,10 @@ namespace Findus.Helpers
             {
                 throw new Exception("Order is missing discount code for applied discount");
             }
-
-            return coupon.code;
+            dynamic code = (coupons["GB"] as IEnumerable<dynamic>).First(i => i.Name == coupon.code);
+            if(code == null)
+                throw new Exception($"WooCommerce order contains unexpected coupon: {coupon.code}");
+            return code.Value?.discount ?? false;
         }
 
         public static decimal GetAccurateCartTax(this WcOrder order)
@@ -245,7 +247,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false)
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null)
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -263,12 +265,8 @@ namespace Findus.Helpers
             bool hasDiscounts = false;
             foreach (var coupon in order.coupon_lines)
             {
-                hasDiscounts = VerifyCoupon(coupon) switch
-                {
-                    "freeshaker" => false,
-                    "gb10" => true,
-                    _ => throw new Exception($"WooCommerce order contains unexpected discount code: {coupon.code}"),
-                };
+                hasDiscounts = VerifyCoupon(coupon, coupons);
+
             }
 
             if (!hasDiscounts && order.discount_total != null && order.discount_total != 0.0M)
@@ -313,7 +311,8 @@ namespace Findus.Helpers
             };
 
             var inv = GenInvoiceAccrual(invAccrualData);
-            if(simplify) {
+            if (simplify)
+            {
                 inv.TrySymplify();
             }
             return inv
@@ -374,14 +373,18 @@ namespace Findus.Helpers
             return inv;
         }
 
-        private static decimal? GetTotalCredit(this IEnumerable<InvoiceAccrualRow> rows) {
+        private static decimal? GetTotalCredit(this IEnumerable<InvoiceAccrualRow> rows)
+        {
             return rows.Where(r => r.Credit != 0).Sum(r => r.Credit);
         }
-        private static decimal? GetTotalDebit(this IEnumerable<InvoiceAccrualRow> rows) {
+        private static decimal? GetTotalDebit(this IEnumerable<InvoiceAccrualRow> rows)
+        {
             return rows.Where(r => r.Debit != 0).Sum(r => r.Debit);
         }
-        private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows) {
-            if(rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0) {
+        private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows)
+        {
+            if (rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0)
+            {
                 throw new Exception("Cannot Concatenate Invoice Accrual Rows than contain both Debit and Credit.");
             }
             return rows.GroupBy(r => r.Account).Select(g => new InvoiceAccrualRow
