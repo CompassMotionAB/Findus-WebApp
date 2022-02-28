@@ -22,7 +22,7 @@ name: Build and deploy ASP.Net Core app to an Azure Web App
 env:
   AZURE_WEBAPP_NAME: FindusWebApp
   AZURE_WEBAPP_PACKAGE_PATH: '.'
-  DOTNET_VERSION: '6.0.x'
+  DOTNET_VERSION: '6.0'
 
 on:
   push:
@@ -57,12 +57,12 @@ jobs:
         run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
       
       - name: Copy appsettings.sample.json to appsettings.json
-        run: cp ${{env.DOTNET_ROOT}}/myapp/appsettings.sample.json ${{ env.DOTNET_ROOT }}/myapp/appsettings.json
+        run: cp -n ${{env.DOTNET_ROOT}}/myapp/appsettings.sample.json ${{ env.DOTNET_ROOT }}/myapp/appsettings.json
       
       - name: App Settings Variable Substitution
         uses: microsoft/variable-substitution@v1
         with:
-          files: ${{env.DOTNET_ROOT}}/myapp/appsettings.json}
+          files: ${{env.DOTNET_ROOT}}/myapp/appsettings.json
         env:
           ConnectionStrings.SQLServerConnectionString: ${{ secrets.SQL_SERVER_CONNECTION_STRING }}
           OAuth2Keys.ClientId: ${{ secrets.FORTNOX_CLIENT_ID }}
@@ -90,10 +90,12 @@ jobs:
         with:
           name: .net-app
 
+      - name: Display structure of downloaded files
+        run: ls -R
+
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/myapp'
