@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/FindusWebApp/bin/Debug/netcoreapp3.1/FindusWebApp.dll",
+            "program": "${workspaceFolder}/FindusWebApp/bin/Debug/net6.0/FindusWebApp.dll",
             "args": [],
             "cwd": "${workspaceFolder}/FindusWebApp",
             "stopAtEntry": false,

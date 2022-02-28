@@ -82,12 +82,16 @@ namespace FindusWebApp.Controllers
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
                 return View("Findus");
             }
+            if(string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo)) {
+                dateFrom = $"{DateTime.Now.AddDays(-8):yyyy-MM-dd}";
+                dateTo = $"{DateTime.Now.AddDays(-1).EndOfDay():yyyy-MM-dd}";
+            }
             var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
             var orders = await Get(orderRoute);
-            ViewData["Orders"] = orders;
-            ViewData["OrderValidation"] = orders.ToDictionary(order => order.id, async order => await VerifyOrderBool(order));
-            //_orderViewModel = new OrderViewModel(await Get(orderRoute), orderRoute);
-            return View("Findus");
+            //ViewData["Orders"] = orders;
+            //ViewData["OrderValidation"] = orders.ToDictionary(order => order.id, async order => await VerifyOrderBool(order));
+            _orderViewModel = new OrderViewModel(orders, orderRoute);
+            return View("Findus", _orderViewModel);
         }
 
         private async Task<decimal> GetCurrencyRate(WcOrder order, decimal? accurateTotal = null)
@@ -273,6 +277,10 @@ namespace FindusWebApp.Controllers
         public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = true)
         {
             /* if (_wcOrderApi == null) { return RedirectToAction("Index"); } */
+            if(orderId == null && (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))) {
+                dateFrom = $"{DateTime.Now.AddDays(-8):yyyy-MM-dd}";
+                dateTo = $"{DateTime.Now.AddDays(-1).EndOfDay():yyyy-MM-dd}";
+            }
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             var orders = await Get(orderRoute);
             return await VerifyOrder(orders, orderRoute, simplify);
