@@ -1,0 +1,4 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/067e5c85-29b8-45bc-b650-87623fe0a626/resourceGroups/appsvc_windows_centralus/providers/Microsoft.Web/sites/FindusWebApp",
+    "appService.deploySubpath": "FindusWebApp"
+}

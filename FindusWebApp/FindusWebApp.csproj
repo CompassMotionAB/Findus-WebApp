@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="web.config"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Include="wwwroot\images\C2FNK_white_btn_lg_default.png" />
     <None Update="SalesAccounts.json"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Update="VATAccounts.json">
@@ -20,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="Fortnox.NET.SDK" Version="4.3.0" />
     <PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="3.6.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
   
