@@ -80,7 +80,7 @@ namespace Findus.Helpers
         public decimal ShippingTotalSEK => ShippingSEK + ShippingVatSEK;
 
         public decimal CartTaxSEK { get; internal set; }
-        public decimal ItemsTaxSEK { get; internal set; }
+        public decimal TotalItemsTaxSEK { get; internal set; }
 
         public decimal TotalSEK;
         public string PaymentMethod;
@@ -214,7 +214,7 @@ namespace Findus.Helpers
 
         public static decimal GetAccurateCartTax(this WcOrder order)
         {
-            decimal total = (decimal)order.line_items.Sum(i => i.taxes.Sum(t => t.total));
+            decimal total = (decimal)order.line_items.Sum(i => i.GetAccurateTaxTotal());
             //total += (decimal)(order.shipping_total + order.shipping_tax);
 
             var diff = MathF.Abs((float)(total - order.cart_tax));
@@ -222,15 +222,15 @@ namespace Findus.Helpers
             if (diff >= 0.01)
             {
                 throw new Exception(
-                    $"WooCommerce order cart tax does not match calculated cart tax. Difference: {total}, {order.cart_tax} = {diff:0.000}");
+                    $"WooCommerce order cart tax does not match calculated cart tax. Difference: {total:0.00}, {order.cart_tax:0.00} = {diff:0.000}");
             }
             return total;
         }
 
-        public static decimal GetAccurateTax(this OrderLineItem item) => (decimal)item.taxes.Sum(t => t.total) / item.quantity ?? 1;
+        public static decimal GetAccurateTaxTotal(this OrderLineItem item) => (decimal)item.taxes.Sum(t => t.total);
         public static decimal GetAccurateTotal(this WcOrder order)
         {
-            decimal total = (decimal)order.line_items.Sum(i => (i.price * i.quantity) + i.taxes.Sum(t => t.total));
+            decimal total = (decimal)order.line_items.Sum(i => (i.price * i.quantity) + i.GetAccurateTaxTotal());
             total += (decimal)(order.shipping_total + order.shipping_tax);
 
             var diff = MathF.Abs((float)(total - order.total));
@@ -238,12 +238,12 @@ namespace Findus.Helpers
             if (diff > 0.01)
             {
                 throw new Exception(
-                    $"WooCommerce order total does not match calculated total. Difference: {total}, {order.total} = {diff:0.000}");
+                    $"WooCommerce order total does not match calculated total. Difference: {total:0.00}, {order.total:0.00} = {diff:0.000}");
             }
             return total;
         }
 
-        public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTax());
+        public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
         public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false)
         {
@@ -279,8 +279,8 @@ namespace Findus.Helpers
             decimal totalCartTax = order.GetAccurateCartTax();
             decimal cartTaxSEK = totalCartTax * currencyRate;
 
-            decimal itemsTax = order.GetTotalItemsTax();
-            decimal itemsTaxSEK = itemsTax * currencyRate;
+            decimal totalItemsTax = order.GetTotalItemsTax();
+            decimal totalItemsTaxSEK = totalItemsTax * currencyRate;
 
             decimal shippingSEK = (decimal)order.shipping_total * currencyRate;
             decimal shippingVatSEK = (decimal)order.shipping_tax * currencyRate;
@@ -304,7 +304,7 @@ namespace Findus.Helpers
                 CurrencyRate = currencyRate,
                 Total = total,
                 CartTaxSEK = cartTaxSEK,
-                ItemsTaxSEK = itemsTaxSEK,
+                TotalItemsTaxSEK = totalItemsTaxSEK,
                 ShippingSEK = shippingSEK,
                 ShippingVatSEK = shippingVatSEK,
                 TotalSEK = totalSEK,
@@ -362,13 +362,13 @@ namespace Findus.Helpers
             var EPSILON = new decimal(1, 0, 0, false, 25); //1e-25m;
             if (diff > EPSILON)
             {
-                throw new Exception($"Total Credit(s) does not match expected Credit(s) in SEK, Expected: {creditTotal}, got {sumOfRows}, Difference: {MathF.Abs((float)(creditTotal - sumOfRows))}");
+                throw new Exception($"Total Credit(s) does not match expected Credit(s) in SEK, Expected: {creditTotal:0.00}, got {sumOfRows:0.00}, Difference: {MathF.Abs((float)(creditTotal - sumOfRows))}");
             }
             var debitTotal = debitRows.GetTotal();
             diff = (decimal)MathF.Abs((float)(creditTotal - debitTotal));
             if (diff >= 0.01M)
             {
-                throw new Exception($"Total Debit does not match Credit(s) in SEK, Credit: {creditTotal}, Debit: {debitTotal}, Difference: {diff}");
+                throw new Exception($"Total Debit does not match Credit(s) in SEK, Credit: {creditTotal:0.00}, Debit: {debitTotal:0.00}, Difference: {diff}");
             }
 
             return inv;
@@ -483,9 +483,9 @@ namespace Findus.Helpers
                         var vatAcc = data.GetVatAcc(isStandard, countryIso: data.CountryIso);
                         taxLabel = data.GetTaxLabel(vatAcc, isStandard: isStandard);
 
-                        var accurateTax = item.GetAccurateTax();
+                        var accurateItemTax = item.GetAccurateTaxTotal() / item.quantity ?? 1;
 
-                        var diff = MathF.Abs((float)(accurateTax - (item.price * vatAcc.Rate)));
+                        var diff = MathF.Abs((float)(accurateItemTax - (item.price * vatAcc.Rate)));
                         // Should not deviate more than 0.01 from WooCommerce subtotal_tax 
                         if (diff >= 0.01)
                         {
@@ -502,7 +502,7 @@ namespace Findus.Helpers
                         );*/
                         inv.AddRow(
                             vatAcc.AccountNr,
-                            credit: accurateTax * data.CurrencyRate,
+                            credit: accurateItemTax * (item.quantity ?? 1) * data.CurrencyRate,
                             info: $"Utgående Moms - {taxLabel}"
                         );
                     }
