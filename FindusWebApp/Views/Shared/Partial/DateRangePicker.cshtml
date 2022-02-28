@@ -12,9 +12,10 @@
         var params = getQueryParameters(location.href)
 
         let dateRange = {
-            start: (params && params.dateFrom) ? moment(params.dateFrom) : moment().subtract(8, 'days'),
-            end: (params && params.dateTo) ? moment(params.dateTo) : moment().subtract(1, 'days'),
+            start: (params && params.dateFrom) ? params.dateFrom : moment().subtract(7, 'days').format('YYYY-MM-DD'),
+            end: (params && params.dateTo) ? params.dateTo : moment().format('YYYY-MM-DD'),
         }
+
         $('input[name="daterange"]').daterangepicker({
             opens: 'left',
             locale: {
@@ -22,10 +23,9 @@
                 seperator: ' -> ',
             },
             seperator: ' -> ',
-            startDate: dateRange.start,
-            endDate: dateRange.end,
+            startDate: moment(dateRange.start),
+            endDate: moment(dateRange.end),
         }, function (start, end, label) {
-            console.log("A new date selection was made: " + start.format('YYYY-MM-DD') + ' to ' + end.format('YYYY-MM-DD'));
             updateDateParameters(start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
         });
     });

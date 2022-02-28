@@ -77,23 +77,22 @@ namespace FindusWebApp.Controllers
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
 
-        public async Task<ActionResult> Index(string dateFrom = null, string dateTo = null)
+        public async Task<ActionResult> Index(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
             if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
             {
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
                 return View("Findus");
             }
-            if(string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo)) {
-                dateFrom = $"{DateTime.Now.AddDays(-8):yyyy-MM-dd}";
-                dateTo = $"{DateTime.Now.AddDays(-1).EndOfDay():yyyy-MM-dd}";
-            }
+            return await Verification(orderId, dateFrom, dateTo);
+            /*
             var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
             var orders = await Get(orderRoute);
             //ViewData["Orders"] = orders;
             //ViewData["OrderValidation"] = orders.ToDictionary(order => order.id, async order => await VerifyOrderBool(order));
             _orderViewModel = new OrderViewModel(orders, orderRoute);
             return View("Findus", _orderViewModel);
+            */
         }
 
         private async Task<decimal> GetCurrencyRate(WcOrder order, decimal? accurateTotal = null)
