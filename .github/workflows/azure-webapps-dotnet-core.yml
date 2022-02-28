@@ -21,13 +21,13 @@ name: Build and deploy ASP.Net Core app to an Azure Web App
 
 env:
   AZURE_WEBAPP_NAME: FindusWebApp
-  AZURE_WEBAPP_PACKAGE_PATH: './FindusWebApp'
-  DOTNET_VERSION: '6'
+  AZURE_WEBAPP_PACKAGE_PATH: '.'
+  DOTNET_VERSION: '6.0.x'
 
 on:
   push:
     branches:
-      - main
+      - joaqim-azure-deploy-1
   workflow_dispatch:
 
 jobs:
@@ -67,9 +67,9 @@ jobs:
           ConnectionStrings.SQLServerConnectionString: ${{ secrets.SQL_SERVER_CONNECTION_STRING }}
           OAuth2Keys.ClientId: ${{ secrets.FORTNOX_CLIENT_ID }}
           OAuth2Keys.ClientSecret: ${{ secrets.FORTNOX_CLIENT_SECRET }}    
-          WooKeys.Key: ${{ secret.WOO_KEYS_KEY }}
-          WooKeys.Secret: ${{ secret.WOO_KEYS_SECRET }}
-          WooKeys.Url: ${{ secret.WOO_KEYS_URL }} 
+          WooKeys.Key: ${{ secrets.WOO_KEYS_KEY }}
+          WooKeys.Secret: ${{ secrets.WOO_KEYS_SECRET }}
+          WooKeys.Url: ${{ secrets.WOO_KEYS_URL }} 
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v2
@@ -96,4 +96,4 @@ jobs:
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          package: '${{ env.AZURE_WEBAPP_PACKAGE_PATH }}/myapp'
