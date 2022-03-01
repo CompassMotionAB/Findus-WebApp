@@ -19,12 +19,14 @@ namespace FindusWebApp
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             Configuration = configuration;
+            Environment = environment;
         }
 
         public IConfiguration Configuration { get; }
+        public IWebHostEnvironment Environment { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
@@ -62,8 +64,7 @@ namespace FindusWebApp
 
             services.AddFortnoxAuthorization(Configuration);
 
-            //services.AddDbContext<TokensContext>(options => options.UseSqlite(Configuration.GetConnectionString("DBConnectionString")));
-            services.AddDbContext<TokensContext>(options => options.UseSqlServer(Configuration.GetConnectionString("SQLServerConnectionString")));
+            services.AddDBService(Environment);
 
             services.AddTransient<IFortnoxServices, FortnoxServices>();
 
@@ -75,6 +76,13 @@ namespace FindusWebApp
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            // Migrate any database changes on startup (includes initial db creation)
+            /* using (var scope = app.ApplicationServices.CreateScope())
+            {
+                var tokensContext = scope.ServiceProvider.GetRequiredService<TokensContext>();
+                tokensContext.Database.Migrate();
+            } */
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
