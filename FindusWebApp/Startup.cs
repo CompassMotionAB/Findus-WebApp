@@ -64,7 +64,7 @@ namespace FindusWebApp
 
             services.AddFortnoxAuthorization(Configuration);
 
-            services.AddDBService(Environment);
+            services.AddDBService();
 
             services.AddTransient<IFortnoxServices, FortnoxServices>();
 
