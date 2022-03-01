@@ -1,4 +1,5 @@
 # Findus Web App
+[![Builtd and Deployed as ASP.Net Core app to Azure Web App](https://github.com/CompassMotionAB/Findus-WebApp/actions/workflows/azure-webapps-dotnet-core.yml/badge.svg)](https://github.com/CompassMotionAB/Findus-WebApp/actions/workflows/azure-webapps-dotnet-core.yml)
 
 ## Verifikat 
 Skapar och Verifierar Fortnox faktureringar av beställning hämtad från
