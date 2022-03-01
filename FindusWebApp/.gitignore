@@ -396,3 +396,9 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Own confidential files
+FortnoxTokenStore.db
+Coupons.json
+appsettings.json
+*.xdt
