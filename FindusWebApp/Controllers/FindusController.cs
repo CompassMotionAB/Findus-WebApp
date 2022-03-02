@@ -84,15 +84,7 @@ namespace FindusWebApp.Controllers
                 ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
                 return View("Findus");
             }
-            return await Verification(orderId, dateFrom, dateTo);
-            /*
-            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
-            var orders = await Get(orderRoute);
-            //ViewData["Orders"] = orders;
-            //ViewData["OrderValidation"] = orders.ToDictionary(order => order.id, async order => await VerifyOrderBool(order));
-            _orderViewModel = new OrderViewModel(orders, orderRoute);
-            return View("Findus", _orderViewModel);
-            */
+            return RedirectToAction("Verification", new { orderId, dateFrom, dateTo });
         }
 
         private async Task<decimal> GetCurrencyRate(WcOrder order, decimal? accurateTotal = null)
@@ -273,6 +265,29 @@ namespace FindusWebApp.Controllers
                 ViewBag.Error = ex.Message;
             }
             return View("Findus");
+        }
+
+        [HttpGet]
+        public async Task<decimal> Sum(string dateFrom = null, string dateTo = null, bool EUR=false) {
+            if (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))
+                return 0;
+            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
+            var orders = await Get(orderRoute);
+
+            decimal result = 0M;
+            foreach(var order in orders) {
+                var total = order.GetAccurateTotal();
+                var currencyRate = EUR ? 1.0M : await GetCurrencyRate(order, total);
+                var shipping = (decimal)order.shipping_total;
+                result += (total + shipping) * currencyRate;
+            }
+            return result;
+        }
+
+        public async Task<ActionResult> Summation(string dateFrom = null, string dateTo = null, bool EUR=false) {
+            var total = await Sum(dateFrom, dateTo, EUR);
+            ViewData["TotalSEK"] = $"{total:0.00}";
+            return View("Summation");
         }
 
         public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = true)
