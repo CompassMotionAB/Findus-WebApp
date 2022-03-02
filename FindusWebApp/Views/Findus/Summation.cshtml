@@ -1,0 +1,7 @@
+@{
+    var TotalSEK = ViewData["TotalSEK"] as string;
+}
+<div class="center-block">
+    <partial name="Partial/DateRangePicker" />
+</div>
+<h1>Total: @Html.Raw(TotalSEK) kr</h1>

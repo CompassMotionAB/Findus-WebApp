@@ -5,9 +5,9 @@ namespace FindusWebApp.Helpers
 
     public static class HttpUtilities
     {
-        public static int GetNeededPages(int pageSize, int maxPerPage, int totalInvoices)
+        public static int GetNeededPages(int pageSize, int maxPerPage, int totalItems)
         {
-            return (int)Math.Ceiling(Math.Min(totalInvoices, maxPerPage) / (float)pageSize);
+            return (int)Math.Ceiling(Math.Min(totalItems, maxPerPage) / (float)pageSize);
         }
         public static int GetNeededPages(int pageSize, int totalSize)
         {

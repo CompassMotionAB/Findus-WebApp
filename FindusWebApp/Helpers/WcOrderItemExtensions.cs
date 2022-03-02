@@ -27,8 +27,8 @@ namespace FindusWebApp.Helpers
         }
         public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null)
         {
-            const int itemsPerPage = 60;
-            const int numPages = 1;
+            const int maxPerPage = 100; //Max
+            int numPages = 1;//HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
 
             bool noFrom = string.IsNullOrEmpty(dateFrom);
             bool noTo = string.IsNullOrEmpty(dateTo);
@@ -56,7 +56,7 @@ namespace FindusWebApp.Helpers
                 return await wcOrderApi.GetPages(dateAfter, dateBefore);
             }
 
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{numPages}x{itemsPerPage}";
+            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{numPages}x{maxPerPage}";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
@@ -64,7 +64,7 @@ namespace FindusWebApp.Helpers
                     dateAfter,
                     dateBefore,
                     numPages: numPages,
-                    itemPerPage: itemsPerPage);
+                    itemPerPage: maxPerPage);
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }
