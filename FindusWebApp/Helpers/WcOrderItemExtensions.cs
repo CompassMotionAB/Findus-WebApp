@@ -15,20 +15,28 @@ namespace FindusWebApp.Helpers
     {
         private static readonly MemoryCacheEntryOptions _orderCacheOptions = new MemoryCacheEntryOptions()
                                     .SetSlidingExpiration(TimeSpan.FromHours(8));
-        public static async Task<List<WcOrder>> GetPages(this WCObject.WCOrderItem wcOrderApi, DateTime dateAfter, DateTime dateBefore, int numPages = 1, int itemPerPage = 16)
+        private static async Task<List<WcOrder>> GetPages(this WCObject.WCOrderItem wcOrderApi, DateTime dateAfter, DateTime dateBefore, int numPages = 1, int itemPerPage = 100)
         {
-            return await wcOrderApi.GetAll(new Dictionary<string, string>() {
+
+            const int dateOffset = 1;
+            var orders = await wcOrderApi.GetAll(new Dictionary<string, string>() {
                     {"page", numPages.ToString()},
                     {"per_page", itemPerPage.ToString()},
-                    {"after", $"{dateAfter:yyyy-MM-ddTHH:mm:ss}"},
-                    {"before", $"{dateBefore:yyyy-MM-ddTHH:mm:ss}"},
+                    //{"after", $"{dateAfter.AddDays(-dateOffset):yyyy-MM-ddTHH:mm:ss}"},
+                    //{"before", $"{dateBefore.AddDays(dateOffset):yyyy-MM-ddTHH:mm:ss}"},
+                    {"after", dateAfter.ToUniversalTime().ToString("o")},
+                    {"before", dateBefore.ToUniversalTime().ToString("o")},
                     {"status", "completed"}
                 });
+            // NOTE: Dirty fix to remove unexpected orders outside date range
+            //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
+            return orders;
         }
         public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null)
         {
-            const int maxPerPage = 100; //Max
-            int numPages = 1;//HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
+            const int maxPerPage = 100; //Max: 100
+            const int numPages = 1;
+            //int numPages = HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
 
             bool noFrom = string.IsNullOrEmpty(dateFrom);
             bool noTo = string.IsNullOrEmpty(dateTo);
@@ -42,8 +50,9 @@ namespace FindusWebApp.Helpers
 
             if (noFrom && noTo)
             {
-                dateAfter = DateTime.Now.AddDays(-7);
-                dateBefore = DateTime.Now;
+                throw new ArgumentException($"Expected dateFrom and dateTo to be both be either null or defined. Received: dateFrom: {dateFrom}, dateTo:{dateTo}");
+                //dateAfter = DateTime.Now.AddDays(-1).EndOfDay().AddTicks(1);
+                //dateBefore = DateTime.Now.EndOfDay();
             }
             else
             {
