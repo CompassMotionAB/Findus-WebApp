@@ -15,21 +15,29 @@ namespace FindusWebApp.Helpers
     {
         private static readonly MemoryCacheEntryOptions _orderCacheOptions = new MemoryCacheEntryOptions()
                                     .SetSlidingExpiration(TimeSpan.FromHours(8));
-        private static async Task<List<WcOrder>> GetPages(this WCObject.WCOrderItem wcOrderApi, DateTime dateAfter, DateTime dateBefore, int numPages = 1, int itemPerPage = 100)
-        {
 
-            const int dateOffset = 1;
+        private static async Task<List<WcOrder>> GetPage(this WCObject.WCOrderItem wcOrderApi, DateTime? dateAfter = null, DateTime? dateBefore = null, string dateStr = null, int pageNumber = 1, int itemPerPage = 100)
+        {
+            if(dateAfter == null && dateBefore == null) {
+                if(string.IsNullOrEmpty(dateStr)) {
+                    throw new ArgumentNullException(nameof(dateStr));
+                }
+                dateAfter = DateTime.Parse(dateStr);
+                dateBefore = dateAfter;
+            } else {
+                dateAfter ??= dateBefore;
+                dateBefore ??= dateAfter;
+            }
             var orders = await wcOrderApi.GetAll(new Dictionary<string, string>() {
-                    {"page", numPages.ToString()},
+                    {"page", pageNumber.ToString()},
                     {"per_page", itemPerPage.ToString()},
-                    //{"after", $"{dateAfter.AddDays(-dateOffset):yyyy-MM-ddTHH:mm:ss}"},
-                    //{"before", $"{dateBefore.AddDays(dateOffset):yyyy-MM-ddTHH:mm:ss}"},
-                    {"after", dateAfter.ToUniversalTime().ToString("o")},
-                    {"before", dateBefore.ToUniversalTime().ToString("o")},
+                    {"after", dateAfter.ToWcDate()},
+                    {"before", dateBefore.ToWcDate()},
                     {"status", "completed"}
                 });
-            // NOTE: Dirty fix to remove unexpected orders outside date range
+            // NOTE: Temporary fix to remove unexpected orders outside date range
             //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
+            if(orders.Count == 0) throw new Exception("Invalid Orders returned from WooCommerce");
             return orders;
         }
         public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null)
@@ -63,17 +71,17 @@ namespace FindusWebApp.Helpers
 
             if (memoryCache == null)
             {
-                return await wcOrderApi.GetPages(dateAfter, dateBefore);
+                return await wcOrderApi.GetPage(dateAfter, dateBefore);
             }
 
             var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{numPages}x{maxPerPage}";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
-                orders = await wcOrderApi.GetPages(
+                orders = await wcOrderApi.GetPage(
                     dateAfter,
                     dateBefore,
-                    numPages: numPages,
+                    pageNumber: numPages,
                     itemPerPage: maxPerPage);
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
