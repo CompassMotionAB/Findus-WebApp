@@ -12,7 +12,7 @@ namespace FindusWebApp.Migrations
                 name: "Token",
                 columns: table => new
                 {
-                    RealmId = table.Column<string>(type: "VARCHAR", maxLength: 50, nullable: false),
+                    RealmId = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
                     AccessToken = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     RefreshToken = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     ScopeHash = table.Column<int>(type: "INTEGER", nullable: false)
