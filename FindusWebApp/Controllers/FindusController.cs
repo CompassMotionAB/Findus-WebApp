@@ -267,6 +267,7 @@ namespace FindusWebApp.Controllers
             return View("Findus");
         }
 
+
         private async Task<decimal> Sum(List<WcOrder> orders, bool EUR=false) {
             decimal result = 0M;
             foreach(var order in orders) {
@@ -277,6 +278,7 @@ namespace FindusWebApp.Controllers
             }
             return result;
         }
+
         [HttpGet]
         public async Task<decimal> Sum(string dateFrom = null, string dateTo = null, bool EUR=false) {
             if (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))

@@ -34,9 +34,10 @@ namespace FindusWebApp.Helpers
         }
         public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null)
         {
-            const int maxPerPage = 100; //Max: 100
-            const int numPages = 1;
-            //int numPages = HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
+
+            const int maxPerPage = 100; //Max
+            const int numPages = 1;//int numPages = HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
+
 
             bool noFrom = string.IsNullOrEmpty(dateFrom);
             bool noTo = string.IsNullOrEmpty(dateTo);
