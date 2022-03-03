@@ -60,6 +60,10 @@ jobs:
       
       - name: Build with dotnet
         run: dotnet build --configuration Release
+      - name: Update Database
+        run: |
+          dotnet tool install --global dotnet-ef --version 5.0.11
+          dotnet ef database update
 
       - name: dotnet publish
         run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp

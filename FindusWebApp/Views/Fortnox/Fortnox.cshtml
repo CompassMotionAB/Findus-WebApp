@@ -48,6 +48,6 @@
 
     @if (Customers != null)
     {
-        @Html.Partial("Partial/CustomerOverview", Customers)
+        <partial name="Partial/CustomerOverview" model="Customers"/>
     }
 </div>
