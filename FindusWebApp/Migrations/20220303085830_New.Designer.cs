@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FindusWebApp.Migrations
 {
     [DbContext(typeof(TokensContext))]
-    [Migration("20220301130144_New")]
+    [Migration("20220303085830_New")]
     partial class New
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
