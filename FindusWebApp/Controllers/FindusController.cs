@@ -267,13 +267,8 @@ namespace FindusWebApp.Controllers
             return View("Findus");
         }
 
-        [HttpGet]
-        public async Task<decimal> Sum(string dateFrom = null, string dateTo = null, bool EUR=false) {
-            if (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))
-                return 0;
-            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
-            var orders = await Get(orderRoute);
 
+        private async Task<decimal> Sum(List<WcOrder> orders, bool EUR=false) {
             decimal result = 0M;
             foreach(var order in orders) {
                 var total = order.GetAccurateTotal();
@@ -284,7 +279,21 @@ namespace FindusWebApp.Controllers
             return result;
         }
 
+        [HttpGet]
+        public async Task<decimal> Sum(string dateFrom = null, string dateTo = null, bool EUR=false) {
+            if (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))
+                return 0;
+            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
+            var orders = await Get(orderRoute);
+            return await Sum(orders);
+        }
+
         public async Task<ActionResult> Summation(string dateFrom = null, string dateTo = null, bool EUR=false) {
+            if(string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo)) {
+                dateFrom = $"{DateTime.Now.AddDays(-1):yyyy-MM-dd}";
+                dateTo = $"{DateTime.Now:yyyy-MM-dd}";
+                return RedirectToAction("Summationa", new {dateFrom, dateTo});
+            }
             var total = await Sum(dateFrom, dateTo, EUR);
             ViewData["TotalSEK"] = $"{total:0.00}";
             return View("Summation");
@@ -294,11 +303,12 @@ namespace FindusWebApp.Controllers
         {
             /* if (_wcOrderApi == null) { return RedirectToAction("Index"); } */
             if(orderId == null && (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))) {
-                dateFrom = $"{DateTime.Now.AddDays(-8):yyyy-MM-dd}";
-                dateTo = $"{DateTime.Now.AddDays(-1).EndOfDay():yyyy-MM-dd}";
+                dateFrom = $"{DateTime.Now.AddDays(-7):yyyy-MM-dd}";
+                dateTo = $"{DateTime.Now.AddDays(-1):yyyy-MM-dd}";
             }
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             var orders = await Get(orderRoute);
+            ViewData["TotalDebitForPeriod"] = $"{await Sum(orders):0.00}";
             return await VerifyOrder(orders, orderRoute, simplify);
         }
     }

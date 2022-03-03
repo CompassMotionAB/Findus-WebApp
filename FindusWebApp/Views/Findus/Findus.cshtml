@@ -13,6 +13,8 @@
     bool OnlyWc = Invoice == null && InvoiceAccrual == null;
     bool Verification = !OnlyWc;
 
+    string TotalDebit = ViewData["TotalDebitForPeriod"] as string;
+
 }
 
 @if (ViewBag.Error != null)
@@ -33,8 +35,9 @@
 <div class="@(OnlyWc ? "" : "side-bar-left")">
     <h1>WooCommerce</h1>
     <div class="center-block">
-        <partial name="Partial/DateRangePicker" />
+        @Html.Partial("Partial/DateRangePicker")
     </div>
+        <span>Totala Debet:en för Period: @Html.Raw(TotalDebit) Kr</span>
     @if (@OrderSelect != null)
     {
         @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @style="width: auto;",

@@ -60,6 +60,7 @@ jobs:
       
       - name: Build with dotnet
         run: dotnet build --configuration Release
+        
       - name: Update Database
         run: |
           dotnet tool install --global dotnet-ef --version 6.0.2
