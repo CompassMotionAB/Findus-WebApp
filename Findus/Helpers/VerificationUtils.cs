@@ -208,7 +208,7 @@ namespace Findus.Helpers
             {
                 throw new Exception("Order is missing discount code for applied discount");
             }
-            dynamic code = (coupons["GB"] as IEnumerable<dynamic>).First(i => i.Name == coupon.code);
+            dynamic code = (coupons["GB"] as IEnumerable<dynamic>).FirstOrDefault(i => i.Name == coupon.code);
             if(code == null)
                 throw new Exception($"WooCommerce order contains unexpected coupon: {coupon.code}");
             return code.Value?.discount ?? false;
@@ -262,12 +262,7 @@ namespace Findus.Helpers
             if (order.fee_lines != null && order.fee_lines.Count != 0)
                 throw new Exception("WooCommerce order contains unexpected 'fee_lines'");
 
-            bool hasDiscounts = false;
-            foreach (var coupon in order.coupon_lines)
-            {
-                hasDiscounts = VerifyCoupon(coupon, coupons);
-
-            }
+            bool hasDiscounts = order.coupon_lines.Any(coupon => VerifyCoupon(coupon, coupons));
 
             if (!hasDiscounts && order.discount_total != null && order.discount_total != 0.0M)
                 throw new Exception("WooCommerce order contains unexpected 'discount_total'");

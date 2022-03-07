@@ -17,21 +17,6 @@
 
 }
 
-@if (ViewBag.Error != null)
-{
-    <p style="font-weight:normal;color:red">
-    <br />
-    @Html.Raw(ViewBag.Error)
-</p>
-}
-@if (ViewBag.Message != null)
-{
-    <p style="font-weight:normal;color:green">
-    <br />
-    @Html.Raw(ViewBag.Message)
-</p>
-}
-
 <div class="@(OnlyWc ? "" : "side-bar-left")">
     <h1>WooCommerce</h1>
     <div class="center-block">
