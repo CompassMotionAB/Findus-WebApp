@@ -12,7 +12,7 @@
         var params = getQueryParameters(location.href)
 
         let dateRange = {
-            start: (params && params.dateFrom) ? params.dateFrom : moment().subtract(7, 'days').format('YYYY-MM-DD'),
+            start: (params && params.dateFrom) ? params.dateFrom : moment().format('YYYY-MM-DD'),
             end: (params && params.dateTo) ? params.dateTo : moment().format('YYYY-MM-DD'),
         }
 

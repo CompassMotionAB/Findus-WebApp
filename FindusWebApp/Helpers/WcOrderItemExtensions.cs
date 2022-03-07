@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 using WooCommerceNET;
 using WooCommerceNET.WooCommerce.v2;
 using Findus.Helpers;
+using System.Linq;
 
 namespace FindusWebApp.Helpers
 {
@@ -15,66 +16,83 @@ namespace FindusWebApp.Helpers
     {
         private static readonly MemoryCacheEntryOptions _orderCacheOptions = new MemoryCacheEntryOptions()
                                     .SetSlidingExpiration(TimeSpan.FromHours(8));
-        private static async Task<List<WcOrder>> GetPages(this WCObject.WCOrderItem wcOrderApi, DateTime dateAfter, DateTime dateBefore, int numPages = 1, int itemPerPage = 100)
+
+        private static async Task<List<WcOrder>> GetPage(this WCObject.WCOrderItem wcOrderApi, DateTime? dateAfter = null, DateTime? dateBefore = null, int pageNumber = 1, int itemPerPage = 100, string dateStr = null)
         {
-
-            const int dateOffset = 1;
-            var orders = await wcOrderApi.GetAll(new Dictionary<string, string>() {
-                    {"page", numPages.ToString()},
-                    {"per_page", itemPerPage.ToString()},
-                    //{"after", $"{dateAfter.AddDays(-dateOffset):yyyy-MM-ddTHH:mm:ss}"},
-                    //{"before", $"{dateBefore.AddDays(dateOffset):yyyy-MM-ddTHH:mm:ss}"},
-                    {"after", dateAfter.ToUniversalTime().ToString("o")},
-                    {"before", dateBefore.ToUniversalTime().ToString("o")},
-                    {"status", "completed"}
-                });
-            // NOTE: Dirty fix to remove unexpected orders outside date range
-            //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
-            return orders;
-        }
-        public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null)
-        {
-
-            const int maxPerPage = 100; //Max
-            const int numPages = 1;//int numPages = HttpUtilities.GetNeededPages(pageSize: 25, maxPerPage);
-
-
-            bool noFrom = string.IsNullOrEmpty(dateFrom);
-            bool noTo = string.IsNullOrEmpty(dateTo);
-            if (noFrom != noTo)
+            if (dateAfter == null && dateBefore == null)
             {
-                throw new ArgumentException($"Expected dateFrom and dateTo to be both be either null or defined. Received: dateFrom: {dateFrom}, dateTo:{dateTo}");
-            }
-
-            DateTime dateAfter;
-            DateTime dateBefore;
-
-            if (noFrom && noTo)
-            {
-                throw new ArgumentException($"Expected dateFrom and dateTo to be both be either null or defined. Received: dateFrom: {dateFrom}, dateTo:{dateTo}");
-                //dateAfter = DateTime.Now.AddDays(-1).EndOfDay().AddTicks(1);
-                //dateBefore = DateTime.Now.EndOfDay();
+                if (string.IsNullOrEmpty(dateStr))
+                {
+                    throw new ArgumentNullException(nameof(dateStr));
+                }
+                dateAfter = DateTime.Parse(dateStr);
+                dateBefore = dateAfter;
             }
             else
             {
-                dateAfter = DateTime.ParseExact(dateFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                dateBefore = DateTime.ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture).EndOfDay();
+                dateAfter ??= dateBefore;
+                dateBefore ??= dateAfter;
             }
+            var orders = await wcOrderApi.GetAll(new Dictionary<string, string>() {
+                    {"page", pageNumber.ToString()},
+                    {"per_page", itemPerPage.ToString()},
+                    {"after", dateAfter.ToWcDate()},
+                    {"before", dateBefore.ToWcDate()},
+                    {"status", "completed"}
+                });
+            // NOTE: Temporary fix to remove unexpected orders outside date range
+            //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
+            if (orders.Count == 0) throw new Exception("Invalid Orders returned from WooCommerce");
+            return orders;
+        }
+        public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null, int pageNumber = 1)
+        {
+            const int itemsPerPage = 100; //Max: 100
+
+            dateFrom ??= dateTo;
+            dateTo ??= dateFrom;
+
+            if (string.IsNullOrEmpty(dateFrom))
+            {
+                throw new ArgumentNullException(nameof(dateFrom));
+            }
+
+            var dateAfter = DateTime.ParseExact(dateFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var dateBefore = DateTime.ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture).EndOfDay();
 
             if (memoryCache == null)
             {
-                return await wcOrderApi.GetPages(dateAfter, dateBefore);
+                return await wcOrderApi.GetPage(dateAfter, dateBefore);
             }
 
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{numPages}x{maxPerPage}";
+            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{pageNumber}x{itemsPerPage}";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
-                orders = await wcOrderApi.GetPages(
-                    dateAfter,
+                //NOTE: Offset date to capture all orders within acceptable limit
+                var dateAfterOffset = dateAfter;
+                dateAfterOffset.AddDays(-12);
+                orders = await wcOrderApi.GetPage(
+                    dateAfterOffset,
                     dateBefore,
-                    numPages: numPages,
-                    itemPerPage: maxPerPage);
+                    pageNumber,
+                    itemsPerPage);
+
+                while (orders.Count >= itemsPerPage * pageNumber)
+                {
+                    pageNumber++;
+                    orders = orders.Concat(
+                        await wcOrderApi.GetPage(
+                            dateAfterOffset,
+                            dateBefore,
+                            pageNumber,
+                            itemsPerPage
+                        )
+                    ).ToList();
+                }
+
+                //NOTE: Ensures that order payments falls within expected time period
+                orders.RemoveAll(o => o.date_paid < dateAfter || o.date_paid > dateBefore);
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }

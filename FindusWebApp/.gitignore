@@ -398,7 +398,7 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Own confidential files
-FortnoxTokenStore.db
+FortnoxTokenStore.db*
 Coupons.json
 appsettings.json
 *.xdt

@@ -15,7 +15,9 @@
         {
             <tr>
                 <td></td>
-                <td>@order.id</td>
+                <td>
+                    @Html.ActionLink(order.id.ToString(),"Verification", "Findus", new {orderId = order.id})
+                    </td>
                 <td>
                     @(OrderValidation.First(i => i.Key == order.id).Value ? "True" : "False")
                 </td>

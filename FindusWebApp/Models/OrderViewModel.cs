@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Findus.Models;
+using Fortnox.SDK.Entities;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Routing;
 using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
@@ -22,6 +23,8 @@ namespace FindusWebApp.Models
                 return $"Missing English Name: {countryCode}";
             }
         }
+
+        public Dictionary<ulong?, InvoiceAccrual> InvoiceAccruals;
 
         public IEnumerable<SelectListItem> OrderSelect
         {
@@ -54,6 +57,7 @@ namespace FindusWebApp.Models
         public string DateFrom => OrderRoute.DateFrom;
         public string DateTo => OrderRoute.DateTo;
         public Dictionary<ulong?, WcOrder> Orders;
+        public Dictionary<ulong?, string> Errors;
         public IDictionary<string, string> OrderRouteData => new Dictionary<string, string> {
             {"orderId", CurrentId.ToString()},
             {"dateFrom", DateFrom},
@@ -69,11 +73,15 @@ namespace FindusWebApp.Models
 
         public OrderRouteModel OrderRoute { get; }
 
-        public OrderViewModel(IList<WcOrder> orders, OrderRouteModel orderRoute)
+        public OrderViewModel(IList<WcOrder> orders, OrderRouteModel orderRoute, Dictionary<ulong?, InvoiceAccrual> invoiceAccruals = null, Dictionary<ulong?, string> errors = null)
         {
             Orders = orders.ToDictionary(item => item.id);
+            Errors = errors ?? new Dictionary<ulong?, string>();
+
             OrderRoute = orderRoute;
             var orderId = orderRoute.OrderId;
+
+            InvoiceAccruals = invoiceAccruals;
 
             OrderRoute.OrderId =
                 orderId != null &&
@@ -82,7 +90,7 @@ namespace FindusWebApp.Models
         }
         public WcOrder GetOrder()
         {
-            return  GetOrder(CurrentId);
+            return GetOrder(CurrentId);
         }
 
         public WcOrder GetOrder(ulong? orderId = null)
@@ -90,10 +98,26 @@ namespace FindusWebApp.Models
             if (orderId == null) return null;
             return Orders.FirstOrDefault(o => o.Key == orderId).Value;
         }
+
+        public bool HasInvoice(string orderId)
+        {
+            var match = InvoiceAccruals
+                .FirstOrDefault(o => o.Key.ToString() == orderId);
+            return match.Value != null;
+            //return !match.Equals(default(KeyValuePair<ulong?, InvoiceAccrual>)) && match.Value != null;
+        }
+        public string GetError(string orderId)
+        {
+            return Errors.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+        }
+        public InvoiceAccrual GetInvoice(string orderId)
+        {
+            return InvoiceAccruals.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+        }
         public WcOrder GetOrder(string orderId = null)
         {
             if (string.IsNullOrEmpty(orderId)) return null;
-            return Orders.FirstOrDefault(o => o.Key == ulong.Parse(orderId)).Value;
+            return Orders.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
 
         public void SetCurrentId(ulong? id)
