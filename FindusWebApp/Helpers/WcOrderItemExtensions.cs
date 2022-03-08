@@ -42,7 +42,7 @@ namespace FindusWebApp.Helpers
                 });
             // NOTE: Temporary fix to remove unexpected orders outside date range
             //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
-            if (orders.Count == 0) throw new Exception("Invalid Orders returned from WooCommerce");
+            if (orders.Count == 0) throw new Exception("No Orders returned from WooCommerce");
             return orders;
         }
         public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null, int pageNumber = 1)

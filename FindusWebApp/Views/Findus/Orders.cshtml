@@ -8,8 +8,8 @@
 
     System.Globalization.CultureInfo Swe = new System.Globalization.CultureInfo("sv-SE");
 
-    string TotalDebit = ((decimal)@Model?.TotalDebit).ToString("N2", Swe);
-    string TotalCredit = ((decimal)@Model?.TotalCredit).ToString("N2", Swe);
+    string TotalDebit = @Model.TotalDebit != null ? ((decimal)@Model.TotalDebit).ToString("N2", Swe) : null;
+    string TotalCredit = @Model.TotalCredit != null ?((decimal)@Model.TotalCredit).ToString("N2", Swe) : null;
 }
 
 <div class="form-group">
@@ -67,14 +67,15 @@
                     </tr>
                     <tr>
                         <td></td>
-                        @if (invoice != null)
-                        {
                             <td colspan="999">
                                 <div style="display:none" id="inv-@order.Value">
-                                    @Html.Partial("Partial/InvoiceAccrual", invoice)
+                                    @if(error == null) {
+                                        @Html.Partial("Partial/InvoiceAccrual", invoice)
+                                    } else {
+                                        @Html.Partial("DisplayTemplates/Order", @Model.GetOrder(order.Value))
+                                    }
                                 </div>
                             </td>
-                        }
                     </tr>
                 }
             </table>

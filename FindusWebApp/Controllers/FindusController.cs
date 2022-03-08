@@ -212,13 +212,17 @@ namespace FindusWebApp.Controllers
         private async Task<List<WcOrder>> Get(OrderRouteModel orderRoute)
         {
             var orders = new List<WcOrder>();
-            if (orderRoute.HasDateRange())
-            {
-                return await _wcOrderApi.GetOrders(orderRoute.DateFrom, orderRoute.DateTo, _memoryCache);
-            }
+
             try
             {
-                orders.Add(await _wcOrderApi.Get(orderRoute.OrderId));
+                if (orderRoute.HasDateRange())
+                {
+                    orders = await _wcOrderApi.GetOrders(orderRoute.DateFrom, orderRoute.DateTo, _memoryCache);
+                }
+                else
+                {
+                    orders.Add(await _wcOrderApi.Get(orderRoute.OrderId));
+                }
             }
             catch (Exception ex)
             {
@@ -272,15 +276,18 @@ namespace FindusWebApp.Controllers
             {
                 0 => ViewBag.Message ?? (orders.Count == 1) ? $"Beställningen är Verifierad" : $"Alla {orders.Count} Beställningar är Verifierade.",
                 1 => ViewBag.Message = $"Ett Verifikat misslyckades, Order Id: {GenOrderActionLinkHTML(lastFailedOrderId)}<br>{errors.First().Value}",
-                _ => ViewBag.Message = $"{errors.Count} st Verifikat misslyckades."
+                _ => ViewBag.Message = $"{errors.Count} st av {orders.Count} totalt Verifikat misslyckades."
             };
 
             _orderViewModel = new OrderViewModel(orders, orderRoute, invoices, errors);
 
-            _orderViewModel.Invoice = invoices.ConcatInvoices().TrySymplify(sort:true);
+            if (errors.Count == 0)
+            {
+                _orderViewModel.Invoice = invoices.ConcatInvoices().TrySymplify(sort: true);
 
-            _orderViewModel.TotalDebit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalDebit();
-            _orderViewModel.TotalCredit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalCredit();
+                _orderViewModel.TotalDebit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalDebit();
+                _orderViewModel.TotalCredit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalCredit();
+            }
 
             return View("Orders", _orderViewModel);
         }

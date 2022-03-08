@@ -565,8 +565,15 @@ namespace Findus.Helpers
 
         public static decimal GetTaxRate(this OrderTaxLine taxLine)
         {
-            var taxLabel = taxLine.label;
-            return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
+            var taxLabel = taxLine.rate_code switch {
+                /*"IE-FOOD & BEVERAGE-1" => "%25 Vat",*/
+                _ => taxLine.label
+            };
+            try {
+                return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
+            } catch(Exception ex) {
+                throw new Exception($"Received unsupported Tax label from WooCommerce: {taxLabel}");
+            }
         }
         public static string VerifyRate(RateModel acc, WcOrder order, OrderLineItem item = null, bool? isStandard = null)
         {
