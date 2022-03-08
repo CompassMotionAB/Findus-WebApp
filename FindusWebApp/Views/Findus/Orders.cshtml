@@ -1,51 +1,84 @@
 @model FindusWebApp.Models.OrderViewModel
 
 @{
-    var OrderSelect = @Model != null ? @Model.OrderSelect : null;
+
+    var OrderSelect = @Model?.OrderSelect;
+    var Invoice = @Model?.Invoice;
+
+
+    System.Globalization.CultureInfo Swe = new System.Globalization.CultureInfo("sv-SE");
+
+    string TotalDebit = ((decimal)@Model?.TotalDebit).ToString("N2", Swe);
+    string TotalCredit = ((decimal)@Model?.TotalCredit).ToString("N2", Swe);
 }
 
 <div class="form-group">
     <div class="center-block">
         <partial name="Partial/DateRangePicker" />
     </div>
-
-    @if (OrderSelect != null)
+    @if (@Model != null)
     {
-        <table class="Grid" cellpadding="0" cellspacing="0">
-            <tr>
-                <th></th>
-                <th scope="col">Order</th>
-                <th scope="col">Select</th>
-            </tr>
-            @foreach (var order in Model.OrderSelect)
+
+        @if (Invoice != null)
+        {
+            @if (TotalDebit != null || TotalCredit != null)
             {
-                var invoice = @Model.GetInvoice(order.Value);
-                string error = @Model.GetError(order.Value);
-
-                <tr>
-                    <td style="width: 40px">
-                        <img src="~/images/plus.png" id="@order.Value" style="width: 100%"/>
-                    </td>
-
-                    <td>
-                        @Html.ActionLink(order.Text,"Verification", "Findus", new {orderId = order.Value})
-                        <div class="text-danger">@Html.Raw(System.Web.HttpUtility.HtmlEncode(error))</div>
-                    </td>
-                    <td><input type='checkbox' value='false' /></td>
-                </tr>
-                <tr>
-                    <td></td>
-                    @if (invoice != null)
-                    {
-                        <td colspan="999">
-                            <div style="display:none" id="inv-@order.Value">
-                                @Html.Partial("Partial/InvoiceAccrual", invoice)
-                            </div>
+                <table class="Grid" style="width: 50%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <th>Total Debet</th>
+                        <th>Total Kredit</th>
+                    </tr>
+                    <tr>
+                        <td style="max-width: 100px;">
+                            @($"{TotalDebit} Kr")
                         </td>
-                    }
-                </tr>
+                        <td style="max-width: 100px;">
+                            @($"{TotalCredit} Kr")
+                        </td>
+                    </tr>
+                </table>
             }
-        </table>
+            <partial name="Partial/InvoiceAccrual" model="Invoice" />
+        }
+
+        @if (OrderSelect != null)
+        {
+            <table class="Grid" cellpadding="0" cellspacing="0">
+                <tr>
+                    <th></th>
+                    <th scope="col">Order</th>
+                    <th scope="col">Select</th>
+                </tr>
+                @foreach (var order in Model.OrderSelect)
+                {
+                    var invoice = @Model.GetInvoice(order.Value);
+                    string error = @Model.GetError(order.Value);
+
+                    <tr>
+                        <td style="width: 40px">
+                            <img src="~/images/plus.png" id="@order.Value" style="width: 100%" />
+                        </td>
+
+                        <td>
+                            @Html.ActionLink(order.Text,"Verification", "Findus", new {orderId = order.Value})
+                            <div class="text-danger">@Html.Raw(System.Web.HttpUtility.HtmlEncode(error))</div>
+                        </td>
+                        <td><input type='checkbox' value='false' /></td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        @if (invoice != null)
+                        {
+                            <td colspan="999">
+                                <div style="display:none" id="inv-@order.Value">
+                                    @Html.Partial("Partial/InvoiceAccrual", invoice)
+                                </div>
+                            </td>
+                        }
+                    </tr>
+                }
+            </table>
+        }
     }
 </div>
 

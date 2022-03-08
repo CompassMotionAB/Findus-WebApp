@@ -209,7 +209,7 @@ namespace Findus.Helpers
                 throw new Exception("Order is missing discount code for applied discount");
             }
             dynamic code = (coupons["GB"] as IEnumerable<dynamic>).FirstOrDefault(i => i.Name == coupon.code);
-            if(code == null)
+            if (code == null)
                 throw new Exception($"WooCommerce order contains unexpected coupon: {coupon.code}");
             return code.Value?.discount ?? false;
         }
@@ -368,14 +368,15 @@ namespace Findus.Helpers
             return inv;
         }
 
-        private static decimal? GetTotalCredit(this IEnumerable<InvoiceAccrualRow> rows)
+        public static decimal? GetTotalCredit(this IEnumerable<InvoiceAccrualRow> rows)
         {
             return rows.Where(r => r.Credit != 0).Sum(r => r.Credit);
         }
-        private static decimal? GetTotalDebit(this IEnumerable<InvoiceAccrualRow> rows)
+        public static decimal? GetTotalDebit(this IEnumerable<InvoiceAccrualRow> rows)
         {
             return rows.Where(r => r.Debit != 0).Sum(r => r.Debit);
         }
+        
         private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows)
         {
             if (rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0)
@@ -391,7 +392,7 @@ namespace Findus.Helpers
             });
         }
 
-        public static InvoiceAccrual TrySymplify(this InvoiceAccrual inv)
+        public static InvoiceAccrual TrySymplify(this InvoiceAccrual inv, bool sort = false)
         {
             var creditRows = inv.InvoiceAccrualRows.Where(r => r.Credit != 0.0M);
             var debitRows = inv.InvoiceAccrualRows.Where(r => r.Debit != 0.0M);
@@ -399,9 +400,31 @@ namespace Findus.Helpers
             creditRows = creditRows.TrySimplify();
             debitRows = debitRows.TrySimplify();
 
+            // Sort Revenue/Fee Payment Accounts to the Top
+            if (sort)
+            {
+                creditRows = creditRows.OrderBy(r => r.Account != 1780).OrderBy(r => r.Account != 1580);
+                debitRows = debitRows.OrderBy(r => r.Account != 6570).OrderBy(r => r.Account != 1580);
+            }
+
             inv.InvoiceAccrualRows = debitRows.Concat(creditRows).ToList();
 
             return inv;
+        }
+
+        public static InvoiceAccrual ConcatInvoices(this Dictionary<ulong?, InvoiceAccrual> invoices)
+        {
+            //var rows = new IEnumerable<InvoiceAccrualRow>();
+            IEnumerable<InvoiceAccrualRow> rows = new List<InvoiceAccrualRow>();
+            foreach (var (id, invoice) in invoices)
+            {
+                rows = rows.Concat(invoice.InvoiceAccrualRows);
+            }
+
+            return new InvoiceAccrual
+            {
+                InvoiceAccrualRows = rows.ToList()
+            };
         }
 
         public static InvoiceAccrual TryAddCartTax(this InvoiceAccrual invoice, InvoiceAccrualData data)

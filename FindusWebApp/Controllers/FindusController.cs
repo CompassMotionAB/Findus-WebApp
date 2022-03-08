@@ -268,32 +268,26 @@ namespace FindusWebApp.Controllers
                     }
                 });
 
-            ViewBag.Message = errors.Count switch {
+            ViewBag.Message = errors.Count switch
+            {
                 0 => ViewBag.Message ?? (orders.Count == 1) ? $"Beställningen är Verifierad" : $"Alla {orders.Count} Beställningar är Verifierade.",
                 1 => ViewBag.Message = $"Ett Verifikat misslyckades, Order Id: {GenOrderActionLinkHTML(lastFailedOrderId)}<br>{errors.First().Value}",
                 _ => ViewBag.Message = $"{errors.Count} st Verifikat misslyckades."
             };
 
             _orderViewModel = new OrderViewModel(orders, orderRoute, invoices, errors);
+
+            _orderViewModel.Invoice = invoices.ConcatInvoices().TrySymplify(sort:true);
+
+            _orderViewModel.TotalDebit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalDebit();
+            _orderViewModel.TotalCredit = _orderViewModel.Invoice.InvoiceAccrualRows.GetTotalCredit();
+
             return View("Orders", _orderViewModel);
         }
 
-        private static string GenOrderActionLinkHTML(ulong? orderId){
-            return $"<a href=\"/Verification?orderId={orderId}\">{orderId}</a>";
-        }
-
-        public async Task<IActionResult> VerificationBatch(string dateFrom = null, string dateTo = null)
+        private static string GenOrderActionLinkHTML(ulong? orderId)
         {
-            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
-            try
-            {
-                ViewData["VerificationData"] = await VerifyOrders(orderRoute);
-            }
-            catch (Exception ex)
-            {
-                ViewBag.Error = ex.Message;
-            }
-            return View("Findus");
+            return $"<a href=\"/Verification?orderId={orderId}\">{orderId}</a>";
         }
 
         private async Task<decimal> Sum(List<WcOrder> orders, bool EUR = false)

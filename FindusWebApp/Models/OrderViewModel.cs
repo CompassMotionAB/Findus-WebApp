@@ -25,6 +25,9 @@ namespace FindusWebApp.Models
         }
 
         public Dictionary<ulong?, InvoiceAccrual> InvoiceAccruals;
+        public InvoiceAccrual Invoice {get; set; }
+        public decimal? TotalDebit {get; set; }
+        public decimal? TotalCredit {get; set; }
 
         public IEnumerable<SelectListItem> OrderSelect
         {

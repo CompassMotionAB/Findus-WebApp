@@ -72,6 +72,8 @@ namespace FindusWebApp.Helpers
                 //NOTE: Offset date to capture all orders within acceptable limit
                 var dateAfterOffset = dateAfter;
                 dateAfterOffset.AddDays(-12);
+                orders = new List<WcOrder>(itemsPerPage);
+                if(orders.Count >= itemsPerPage) throw new Exception("Assertion failed");
                 orders = await wcOrderApi.GetPage(
                     dateAfterOffset,
                     dateBefore,
@@ -81,6 +83,7 @@ namespace FindusWebApp.Helpers
                 while (orders.Count >= itemsPerPage * pageNumber)
                 {
                     pageNumber++;
+                    orders.EnsureCapacity(itemsPerPage * pageNumber);
                     orders = orders.Concat(
                         await wcOrderApi.GetPage(
                             dateAfterOffset,
@@ -93,6 +96,7 @@ namespace FindusWebApp.Helpers
 
                 //NOTE: Ensures that order payments falls within expected time period
                 orders.RemoveAll(o => o.date_paid < dateAfter || o.date_paid > dateBefore);
+                orders.TrimExcess();
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }
