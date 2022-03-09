@@ -18,6 +18,9 @@ using FindusWebApp.Helpers;
 using Microsoft.Extensions.Options;
 using Fortnox.SDK.Entities;
 using FindusWebApp.Extensions;
+using FindusWebApp.Services.Fortnox;
+using Fortnox.SDK.Exceptions;
+using Fortnox.SDK.Search;
 
 namespace FindusWebApp.Controllers
 {
@@ -44,17 +47,20 @@ namespace FindusWebApp.Controllers
         private readonly WCObject.WCOrderItem _wcOrderApi;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMemoryCache _memoryCache;
-        private readonly MemoryCacheEntryOptions _orderCacheOptions;
+        private readonly MemoryCacheEntryOptions _cacheEntryOptions;
         private readonly AccountsModel _accounts;
         private readonly dynamic _coupons;
         private OrderViewModel _orderViewModel;
 
-        public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions)
+        private readonly IFortnoxServices _fortnox;
+
+        public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions, IFortnoxServices fortnox)
         {
             _httpClientFactory = httpClientFactory;
             _memoryCache = memoryCache;
-            _orderCacheOptions = new MemoryCacheEntryOptions()
+            _cacheEntryOptions = new MemoryCacheEntryOptions()
                                     .SetSlidingExpiration(TimeSpan.FromHours(8));
+            _fortnox = fortnox;
 
             _wcKeys = wcKeysOptions.Value;
 
@@ -182,8 +188,6 @@ namespace FindusWebApp.Controllers
         {
             if (orderId != null || order != null)
             {
-                return new EmptyResult();
-            }
                 try
                 {
                     order = order != null ? await Get(orderId) : order;
@@ -403,6 +407,73 @@ namespace FindusWebApp.Controllers
             var orders = await Get(orderRoute);
             ViewData["TotalDebitForPeriod"] = $"{await Sum(orders):0.00}";
             return await VerifyOrder(orders, orderRoute, simplify);
+        }
+
+        [HttpGet]
+        public async Task<string> TestAsync(string customerEmail = null)
+        {
+            customerEmail ??= "test@mail.com";
+            return await TryGetCustomerNr(customerEmail);
+        }
+
+        private async Task Call(Action<FortnoxContext> action)
+        {
+            try
+            {
+                await _fortnox.FortnoxApiCall(action);
+            }
+            catch (FortnoxApiException ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+        }
+
+        private async void TryGetCustomer(FortnoxContext context)
+        {
+            var customerEmail = TempData.Peek("CustomerEmail") as string;
+            var cacheKey = $"customer-{customerEmail}";
+            if (!_memoryCache.TryGetValue(cacheKey, out string customerNr))
+            {
+                var customerCon = context.Client.CustomerConnector;
+                var customerSubsetList = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, }).Result;
+
+                if (customerSubsetList != null && customerSubsetList.Entities.Count == 1)
+                {
+                    customerNr = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
+                }
+                else
+                {
+                    await Call(CreateNewCustomer);
+                    customerNr = TempData.Peek("CustomerNr") as string;
+
+                }
+                _memoryCache.Set(cacheKey, customerNr, _cacheEntryOptions);
+            }
+            TempData["CustomerNr"] = customerNr;
+        }
+        private async Task<string> TryGetCustomerNr(string customerEmail)
+        {
+            TempData["CustomerEmail"] = customerEmail;
+            await Call(TryGetCustomer);
+            return TempData.Peek("CustomerNr") as string;
+        }
+
+        private void CreateNewCustomer(FortnoxContext context)
+        {
+            var customerEmail = TempData.Peek("CustomerEmail") as string;
+            if (String.IsNullOrEmpty(customerEmail)) throw new ArgumentNullException("TempData[\"CustomerEmail\"]");
+
+            var client = context.Client;
+            var customerConn = client.CustomerConnector;
+            var newCust = new Fortnox.SDK.Entities.Customer
+            {
+                Email = customerEmail,
+            };
+            var customer = customerConn.CreateAsync(newCust).Result;
+            //TempData["Customer"] = customer;
+            ViewData["CustomerNr"] = customer.CustomerNumber;
+
+            //ViewData["CustomerInfo"] = "Customer with ID: " + customer.CustomerNumber + " created successfully.";
         }
     }
 }
