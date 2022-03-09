@@ -76,7 +76,7 @@ namespace FindusWebApp.Controllers
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
 
-        public async Task<ActionResult> Index(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        public ActionResult Index(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
             if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
             {
@@ -180,20 +180,45 @@ namespace FindusWebApp.Controllers
         //[Route("api/orders/invoiceaccrual")]
         public async Task<ActionResult> GetInvoiceAccrual(ulong? orderId = null, WcOrder order = null)
         {
-            if (orderId == null && order == null)
+            if (orderId != null || order != null)
             {
                 return new EmptyResult();
             }
-            try
-            {
-                var invoice = await Verify(order);
-                return View("Partial/InvoiceAccrual", invoice);
-            }
-            catch (Exception ex)
-            {
-                ViewBag.Error = ex.Message;
+                try
+                {
+                    order = order != null ? await Get(orderId) : order;
+                    var invoice = await Verify(order);
+                    return View("Partial/InvoiceAccrual", invoice);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                }
             }
             return new EmptyResult();
+        }
+        public async Task<ActionResult> GetInvoice(ulong? orderId = null, WcOrder order = null)
+        {
+            if (orderId != null || order != null)
+            {
+                try
+                {
+                    order = order != null ? await Get(orderId) : order;
+                    var invoice = await VerifyInvoice(order);
+                    return View("DisplayTemplates/Invoice", invoice);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                }
+            }
+            return new EmptyResult();
+        }
+
+        public async Task<Invoice> VerifyInvoice(WcOrder order, decimal? currencyRate = null)
+        {
+            currencyRate ??= await GetCurrencyRate(order);
+            return VerificationUtils.GenInvoice(order, (decimal)currencyRate);
         }
 
         private async Task<bool> VerifyOrderBool(WcOrder order)
@@ -209,6 +234,10 @@ namespace FindusWebApp.Controllers
             }
         }
 
+        private async Task<WcOrder> Get(ulong? orderId)
+        {
+            return await _wcOrderApi.Get(orderId);
+        }
         private async Task<List<WcOrder>> Get(OrderRouteModel orderRoute)
         {
             var orders = new List<WcOrder>();
