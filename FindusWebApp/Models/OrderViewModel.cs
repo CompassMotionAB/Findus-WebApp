@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
+using Findus.Helpers;
 using Findus.Models;
 using Fortnox.SDK.Entities;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -12,18 +12,6 @@ namespace FindusWebApp.Models
 {
     public class OrderViewModel
     {
-        private static string GetEnglishName(string countryCode)
-        {
-            try
-            {
-                return new RegionInfo(countryCode).EnglishName;
-            }
-            catch (Exception)
-            {
-                return $"Missing English Name: {countryCode}";
-            }
-        }
-
         public Dictionary<ulong?, InvoiceAccrual> InvoiceAccruals;
         public InvoiceAccrual Invoice {get; set; }
         public decimal? TotalDebit {get; set; }
@@ -45,7 +33,7 @@ namespace FindusWebApp.Models
                                               "{0:yyyy-MM-dd H:mm}",
                                                o.Value.date_paid ?? o.Value.date_created
                                           ),
-                                          GetEnglishName(o.Value.shipping.country)
+                                          CountryUtils.GetEnglishName(o.Value.shipping.country)
                                           ),
                                       }, "id", "Value", CurrentId);
             }
