@@ -168,32 +168,48 @@ namespace Findus.Helpers
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
 
-        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null)
+        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null, string customerNr = null)
         {
             if (order.date_paid == null) throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1) throw new Exception($"Order Id: {order.id} is missing items in order");
+            if (order.currency.ToUpper() != "EUR") throw new Exception($"Expected WooCommerce order to be in EUR");
 
             var invoiceRows = new List<InvoiceRow>();
-            order.line_items.ForEach(i =>
+            // Assuming Product/Article exists in Fortnox
+            order.line_items.ForEach( i =>
                 invoiceRows.Add(new InvoiceRow
                 {
-                    Price = i.price,
+                    Price = i.GetTotalWithTax() * currencyRate,
+                    ArticleNumber = i.sku,
+                    DeliveredQuantity = i.quantity,
                 })
             );
 
             return new Invoice()
             {
-                Currency = "SEK",//order.currency.ToUpper(),
-                CurrencyRate = currencyRate,
+                CustomerNumber = customerNr,
+
+                Currency = "SEK",
+                CurrencyRate = 1, // TODO: Should this be 1, since we've already converted EUR->SEK?
                 FinalPayDate = (DateTime)order.date_paid,
                 YourOrderNumber = order.id.ToString(),
-                YourReference = order.billing.email,
+                YourReference = order.customer_id?.ToString(),
 
-                CustomerName = (order.billing.first_name + $" {order.billing.last_name}").Trim(),
+                CustomerName = ($"{order.billing.first_name} {order.billing.last_name}").Trim(),
+
+                Country = CountryUtils.GetEnglishName(order.billing.country),
                 Address1 = order.billing.address_1,
                 Address2 = order.billing.address_2,
                 ZipCode = order.billing.postcode,
                 City = order.billing.city,
+
+                DeliveryCountry = CountryUtils.GetEnglishName(order.shipping.country),
+                DeliveryAddress1 = order.shipping.address_1,
+                DeliveryAddress2 = order.shipping.address_2,
+                DeliveryZipCode = order.shipping.postcode,
+                DeliveryCity = order.shipping.city,
+
+                InvoiceRows = invoiceRows,
             };
         }
 
@@ -229,6 +245,7 @@ namespace Findus.Helpers
             return total;
         }
 
+        public static decimal GetTotalWithTax(this OrderLineItem item) => (decimal)item.price + item.GetAccurateTaxTotal();
         public static decimal GetAccurateTaxTotal(this OrderLineItem item) => (decimal)item.taxes.Sum(t => t.total);
         public static decimal GetAccurateTotal(this WcOrder order)
         {
@@ -376,7 +393,7 @@ namespace Findus.Helpers
         {
             return rows.Where(r => r.Debit != 0).Sum(r => r.Debit);
         }
-        
+
         private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows)
         {
             if (rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0)
@@ -565,13 +582,17 @@ namespace Findus.Helpers
 
         public static decimal GetTaxRate(this OrderTaxLine taxLine)
         {
-            var taxLabel = taxLine.rate_code switch {
+            var taxLabel = taxLine.rate_code switch
+            {
                 /*"IE-FOOD & BEVERAGE-1" => "%25 Vat",*/
                 _ => taxLine.label
             };
-            try {
+            try
+            {
                 return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
-            } catch(Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 throw new Exception($"Received unsupported Tax label from WooCommerce: {taxLabel}");
             }
         }
