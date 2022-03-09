@@ -5,21 +5,44 @@
     }
 </style>
 
-<h2>Invoice</h2>
-<table>
-    <tr>
-        <th>Växelkurs (SEK-EUR)</th>
-        <th>Betalningsdatum?</th>
+@{
+    //Layout = null;
+}
 
-        <th>Kund</th>
+<h2>Faktura</h2>
+<table>
+    <h3>Kund</h3>
+    <tr>
+        <th>Kund Nr.</th>
+        <th>Valuta</th>
+
+        <th>Växelkurs</th>
+        <th>Betalningsdatum</th>
+
+        <th>Kundnamn</th>
+        <th>Land</th>
         <th>Stad</th>
-        <th></th>
+        <th>Post Nr.</th>
+        <th>Adress 1</th>
+        <th>Adress 2</th>
     </tr>
     <tr>
-        <td>@($"{Model.CurrencyRate:0.######}")</td>
+        <td>@Model.CustomerNumber</td>
+        <td>@Model.Currency</td>
+
+        <td>@($"{Model.CurrencyRate:0.####}")</td>
         <td>@Html.DisplayFor(m => @Model.FinalPayDate)</td>
 
         <td>@Model.CustomerName</td>
+        <td>@Model.Country</td>
         <td>@Model.City</td>
+        <td>@Model.ZipCode</td>
+        <td>@Model.Address1</td>
+        <td>@Model.Address2</td>
     </tr>
 </table>
+@if (@Model.InvoiceRows != null)
+{
+    <h3>Produkter</h3>
+    @Html.Partial("Partial/InvoiceRows", @Model.InvoiceRows)
+}

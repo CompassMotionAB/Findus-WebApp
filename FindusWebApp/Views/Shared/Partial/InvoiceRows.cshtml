@@ -1,0 +1,26 @@
+@model List<Fortnox.SDK.Entities.InvoiceRow>
+@{
+    Layout = null;
+}
+
+@if (@Model != null)
+{
+
+    <table style="max-width:50%;">
+    <tr>
+        <th></th>
+        <th>SKU</th>
+        <th>Pris</th>
+        <th>Kvantitet</th>
+    </tr>
+    @foreach (var row in @Model)
+        {
+            <tr>
+                <td style="background-color: lightgreen;"></td>
+                <td>@($"{row.Price:F2}")</td>
+                <td>@row.ArticleNumber</td>
+                <td>@row.DeliveredQuantity</td>
+            </tr>
+        }
+    </table>
+}

@@ -8,8 +8,8 @@
 
     System.Globalization.CultureInfo Swe = new System.Globalization.CultureInfo("sv-SE");
 
-    string TotalDebit = @Model.TotalDebit != null ? ((decimal)@Model.TotalDebit).ToString("N2", Swe) : null;
-    string TotalCredit = @Model.TotalCredit != null ?((decimal)@Model.TotalCredit).ToString("N2", Swe) : null;
+    string TotalDebit = @Model?.TotalDebit != null ? ((decimal)@Model.TotalDebit).ToString("N2", Swe) : null;
+    string TotalCredit = @Model?.TotalCredit != null ?((decimal)@Model.TotalCredit).ToString("N2", Swe) : null;
 }
 
 <div class="form-group">
