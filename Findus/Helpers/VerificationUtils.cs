@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Findus.Models;
 using Fortnox.SDK.Entities;
 using WooCommerceNET.WooCommerce.v2;
+using Customer = Fortnox.SDK.Entities.Customer;
 using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
@@ -85,6 +86,9 @@ namespace Findus.Helpers
         public decimal TotalSEK;
         public string PaymentMethod;
         public bool IsInEu;
+        public string CustomerNumber;
+        public long? InvoiceNumber;
+        public string Period;
     }
 
     public static class VerificationUtils
@@ -189,13 +193,17 @@ namespace Findus.Helpers
             {
                 CustomerNumber = customerNr,
 
+                InvoiceType = InvoiceType.Invoice,
+                InvoiceDate = order.date_completed,
+
+                // PaymentWay = PaymentWay.Card,
+
                 Currency = "SEK",
                 CurrencyRate = 1, // TODO: Should this be 1, since we've already converted EUR->SEK?
-                FinalPayDate = (DateTime)order.date_paid,
                 YourOrderNumber = order.id.ToString(),
                 YourReference = order.customer_id?.ToString(),
 
-                CustomerName = ($"{order.billing.first_name} {order.billing.last_name}").Trim(),
+                CustomerName = $"{order.billing.first_name} {order.billing.last_name}".Trim(),
 
                 Country = CountryUtils.GetEnglishName(order.billing.country),
                 Address1 = order.billing.address_1,
@@ -264,7 +272,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null)
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null)
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -300,6 +308,11 @@ namespace Findus.Helpers
 
             var invAccrualData = new InvoiceAccrualData
             {
+                CustomerNumber = customerNr,
+                InvoiceNumber = invoiceNr,
+                Period = period,
+
+
                 Order = order,
                 CountryIso = countryIso,
                 IsInEu = isInEu,
@@ -480,10 +493,40 @@ namespace Findus.Helpers
             return invoice;
         }
 
+        public static Customer GetCustomer(this Invoice invoice, WcOrder order) {
+            return new Customer {
+                Name = invoice.CustomerName,
+
+                Email = order.billing.email,
+                CountryCode = order.shipping.country.ToUpper(),
+
+                Address1 = invoice.Address1,
+                Address2 = invoice.Address2,
+                City = invoice.City,
+
+                YourReference = order.customer_id.ToString(),
+
+                DeliveryName = invoice.DeliveryName,
+                DeliveryAddress1 = invoice.DeliveryAddress1,
+                DeliveryAddress2 = invoice.DeliveryAddress2,
+                DeliveryCity = invoice.DeliveryCity,
+                DeliveryZipCode = invoice.DeliveryZipCode,
+            };
+        }
+
+        public static Customer GenCustomer(Invoice invoice, WcOrder order){
+            return invoice.GetCustomer(order);
+        }
+
         private static InvoiceAccrual GenInvoiceAccrual(InvoiceAccrualData data)
         {
             var inv = new InvoiceAccrual()
             {
+                Description = $"Faktura för order id: {data.Order.id}",
+                Period = data.Period,
+                InvoiceNumber = data.InvoiceNumber,
+                StartDate = data.Order.date_completed,
+                EndDate = data.Order.date_completed,
                 InvoiceAccrualRows = new List<InvoiceAccrualRow>()
             };
             if (data.IsInEu)

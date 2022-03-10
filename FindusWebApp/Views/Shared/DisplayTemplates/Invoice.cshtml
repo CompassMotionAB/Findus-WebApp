@@ -9,8 +9,8 @@
     //Layout = null;
 }
 
-<h2>Faktura</h2>
-<table>
+<h2>Kundfaktura</h2>
+@* <table>
     <h3>Kund</h3>
     <tr>
         <th>Kund Nr.</th>
@@ -31,7 +31,7 @@
         <td>@Model.Currency</td>
 
         <td>@($"{Model.CurrencyRate:0.####}")</td>
-        <td>@Html.DisplayFor(m => @Model.FinalPayDate)</td>
+        <td>@Html.DisplayFor(m => @Model.InvoiceDate)</td>
 
         <td>@Model.CustomerName</td>
         <td>@Model.Country</td>
@@ -41,6 +41,13 @@
         <td>@Model.Address2</td>
     </tr>
 </table>
+ *@
+ <p>
+     @Model.CustomerName<br>
+     @Model.Country<br>
+     @Model.City @Model.ZipCode
+     @Model.Address1 @Model.Address2
+ </p>
 @if (@Model.InvoiceRows != null)
 {
     <h3>Produkter</h3>

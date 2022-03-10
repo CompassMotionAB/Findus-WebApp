@@ -26,7 +26,8 @@
             startDate: moment(dateRange.start),
             endDate: moment(dateRange.end),
         }, function (start, end, label) {
-            updateDateParameters(start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
+            if(start != undefined && end != undefined)
+                updateDateParameters(start.format('YYYY-MM-DD'), end.format('YYYY-MM-DD'));
         });
     });
 

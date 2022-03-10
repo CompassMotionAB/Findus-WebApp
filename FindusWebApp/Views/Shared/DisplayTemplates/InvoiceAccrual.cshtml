@@ -4,7 +4,13 @@
     Layout = null;
 }
 
+<h2>Periodisering av Kundfaktura</h2>
 <div class="form-group">
+    <p>
+    @Model.Description<br>
+    Start Datum: @Html.DisplayFor(m => @Model.StartDate)<br>
+    Slut Datum: @Html.DisplayFor(m => @Model.EndDate)
+    </p>
     <table style="width: 100%; margin: auto;">
         <tr>
             <th style="min-width: 250px;"></th>

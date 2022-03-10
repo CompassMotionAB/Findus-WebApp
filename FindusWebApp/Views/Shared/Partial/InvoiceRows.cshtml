@@ -6,19 +6,19 @@
 @if (@Model != null)
 {
 
-    <table style="max-width:50%;">
+    <table style="max-width:75%;">
     <tr>
         <th></th>
         <th>SKU</th>
-        <th>Pris</th>
+        <th>Kostnad</th>
         <th>Kvantitet</th>
     </tr>
     @foreach (var row in @Model)
         {
             <tr>
                 <td style="background-color: lightgreen;"></td>
-                <td>@($"{row.Price:F2}")</td>
                 <td>@row.ArticleNumber</td>
+                <td>@($"{row.Price:F2}")</td><span>(Inkl. Moms)</span>
                 <td>@row.DeliveredQuantity</td>
             </tr>
         }
