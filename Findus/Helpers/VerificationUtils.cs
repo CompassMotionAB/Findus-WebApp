@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Findus.Models;
 using Fortnox.SDK.Entities;
 using WooCommerceNET.WooCommerce.v2;
+using Customer = Fortnox.SDK.Entities.Customer;
 using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
@@ -85,6 +86,9 @@ namespace Findus.Helpers
         public decimal TotalSEK;
         public string PaymentMethod;
         public bool IsInEu;
+        public string CustomerNumber;
+        public long? InvoiceNumber;
+        public string Period;
     }
 
     public static class VerificationUtils
@@ -168,32 +172,52 @@ namespace Findus.Helpers
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
 
-        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null)
+        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null, string customerNr = null)
         {
             if (order.date_paid == null) throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1) throw new Exception($"Order Id: {order.id} is missing items in order");
+            if (order.currency.ToUpper() != "EUR") throw new Exception($"Expected WooCommerce order to be in EUR");
 
             var invoiceRows = new List<InvoiceRow>();
-            order.line_items.ForEach(i =>
+            // Assuming Product/Article exists in Fortnox
+            order.line_items.ForEach( i =>
                 invoiceRows.Add(new InvoiceRow
                 {
-                    Price = i.price,
+                    Price = i.GetTotalWithTax() * currencyRate,
+                    ArticleNumber = i.sku,
+                    DeliveredQuantity = i.quantity,
                 })
             );
 
             return new Invoice()
             {
-                Currency = "SEK",//order.currency.ToUpper(),
-                CurrencyRate = currencyRate,
-                FinalPayDate = (DateTime)order.date_paid,
-                YourOrderNumber = order.id.ToString(),
-                YourReference = order.billing.email,
+                CustomerNumber = customerNr,
 
-                CustomerName = (order.billing.first_name + $" {order.billing.last_name}").Trim(),
+                InvoiceType = InvoiceType.Invoice,
+                InvoiceDate = order.date_completed,
+
+                // PaymentWay = PaymentWay.Card,
+
+                Currency = "SEK",
+                CurrencyRate = 1, // TODO: Should this be 1, since we've already converted EUR->SEK?
+                YourOrderNumber = order.id.ToString(),
+                YourReference = order.customer_id?.ToString(),
+
+                CustomerName = $"{order.billing.first_name} {order.billing.last_name}".Trim(),
+
+                Country = CountryUtils.GetEnglishName(order.billing.country),
                 Address1 = order.billing.address_1,
                 Address2 = order.billing.address_2,
                 ZipCode = order.billing.postcode,
                 City = order.billing.city,
+
+                DeliveryCountry = CountryUtils.GetEnglishName(order.shipping.country),
+                DeliveryAddress1 = order.shipping.address_1,
+                DeliveryAddress2 = order.shipping.address_2,
+                DeliveryZipCode = order.shipping.postcode,
+                DeliveryCity = order.shipping.city,
+
+                InvoiceRows = invoiceRows,
             };
         }
 
@@ -229,6 +253,7 @@ namespace Findus.Helpers
             return total;
         }
 
+        public static decimal GetTotalWithTax(this OrderLineItem item) => (decimal)item.price + item.GetAccurateTaxTotal();
         public static decimal GetAccurateTaxTotal(this OrderLineItem item) => (decimal)item.taxes.Sum(t => t.total);
         public static decimal GetAccurateTotal(this WcOrder order)
         {
@@ -247,7 +272,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null)
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null)
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -283,6 +308,11 @@ namespace Findus.Helpers
 
             var invAccrualData = new InvoiceAccrualData
             {
+                CustomerNumber = customerNr,
+                InvoiceNumber = invoiceNr,
+                Period = period,
+
+
                 Order = order,
                 CountryIso = countryIso,
                 IsInEu = isInEu,
@@ -376,7 +406,7 @@ namespace Findus.Helpers
         {
             return rows.Where(r => r.Debit != 0).Sum(r => r.Debit);
         }
-        
+
         private static IEnumerable<InvoiceAccrualRow> TrySimplify(this IEnumerable<InvoiceAccrualRow> rows)
         {
             if (rows.GetTotalDebit() != 0 && rows.GetTotalCredit() != 0)
@@ -463,10 +493,40 @@ namespace Findus.Helpers
             return invoice;
         }
 
+        public static Customer GetCustomer(this Invoice invoice, WcOrder order) {
+            return new Customer {
+                Name = invoice.CustomerName,
+
+                Email = order.billing.email,
+                CountryCode = order.shipping.country.ToUpper(),
+
+                Address1 = invoice.Address1,
+                Address2 = invoice.Address2,
+                City = invoice.City,
+
+                YourReference = order.customer_id.ToString(),
+
+                DeliveryName = invoice.DeliveryName,
+                DeliveryAddress1 = invoice.DeliveryAddress1,
+                DeliveryAddress2 = invoice.DeliveryAddress2,
+                DeliveryCity = invoice.DeliveryCity,
+                DeliveryZipCode = invoice.DeliveryZipCode,
+            };
+        }
+
+        public static Customer GenCustomer(Invoice invoice, WcOrder order){
+            return invoice.GetCustomer(order);
+        }
+
         private static InvoiceAccrual GenInvoiceAccrual(InvoiceAccrualData data)
         {
             var inv = new InvoiceAccrual()
             {
+                Description = $"Faktura för order id: {data.Order.id}",
+                Period = data.Period,
+                InvoiceNumber = data.InvoiceNumber,
+                StartDate = data.Order.date_completed,
+                EndDate = data.Order.date_completed,
                 InvoiceAccrualRows = new List<InvoiceAccrualRow>()
             };
             if (data.IsInEu)
@@ -565,13 +625,17 @@ namespace Findus.Helpers
 
         public static decimal GetTaxRate(this OrderTaxLine taxLine)
         {
-            var taxLabel = taxLine.rate_code switch {
+            var taxLabel = taxLine.rate_code switch
+            {
                 /*"IE-FOOD & BEVERAGE-1" => "%25 Vat",*/
                 _ => taxLine.label
             };
-            try {
+            try
+            {
                 return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
-            } catch(Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 throw new Exception($"Received unsupported Tax label from WooCommerce: {taxLabel}");
             }
         }

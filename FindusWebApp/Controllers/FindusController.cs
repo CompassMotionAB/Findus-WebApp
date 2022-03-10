@@ -18,6 +18,10 @@ using FindusWebApp.Helpers;
 using Microsoft.Extensions.Options;
 using Fortnox.SDK.Entities;
 using FindusWebApp.Extensions;
+using FindusWebApp.Services.Fortnox;
+using Fortnox.SDK.Exceptions;
+using Fortnox.SDK.Search;
+using Customer = Fortnox.SDK.Entities.Customer;
 
 namespace FindusWebApp.Controllers
 {
@@ -44,17 +48,20 @@ namespace FindusWebApp.Controllers
         private readonly WCObject.WCOrderItem _wcOrderApi;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMemoryCache _memoryCache;
-        private readonly MemoryCacheEntryOptions _orderCacheOptions;
+        private readonly MemoryCacheEntryOptions _cacheEntryOptions;
         private readonly AccountsModel _accounts;
         private readonly dynamic _coupons;
         private OrderViewModel _orderViewModel;
 
-        public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions)
+        private readonly IFortnoxServices _fortnox;
+
+        public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions, IFortnoxServices fortnox)
         {
             _httpClientFactory = httpClientFactory;
             _memoryCache = memoryCache;
-            _orderCacheOptions = new MemoryCacheEntryOptions()
+            _cacheEntryOptions = new MemoryCacheEntryOptions()
                                     .SetSlidingExpiration(TimeSpan.FromHours(8));
+            _fortnox = fortnox;
 
             _wcKeys = wcKeysOptions.Value;
 
@@ -76,7 +83,7 @@ namespace FindusWebApp.Controllers
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
 
-        public async Task<ActionResult> Index(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        public ActionResult Index(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
             if (string.IsNullOrEmpty(_wcKeys.Key) || string.IsNullOrEmpty(_wcKeys.Secret) || string.IsNullOrEmpty(_wcKeys.Url))
             {
@@ -125,36 +132,17 @@ namespace FindusWebApp.Controllers
             return await CurrencyUtils.GetSEKCurrencyRateAsync(date, order.currency.ToUpper(), httpClient);
         }
 
-        private async Task<Dictionary<ulong, VerificationResult>> VerifyOrders(OrderRouteModel orderRoute, bool simplify = true)
-        {
-            var result = new Dictionary<ulong, VerificationResult>();
-            var orders = await Get(orderRoute);
-            _orderViewModel = new OrderViewModel(orders, orderRoute);
-            foreach (var order in orders)
-            {
-                try
-                {
-                    var invoiceAccrual = await Verify(order, simplify);
-
-                    result.Add((ulong)order.id, new VerificationResult(invoiceAccrual));
-                }
-                catch (Exception ex)
-                {
-                    result.Add((ulong)order.id, new VerificationResult(errorMessage: ex.Message));
-                }
-            }
-
-            return result;
-        }
-
         private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = true)
         {
             try
             {
                 _orderViewModel = new OrderViewModel(orders, orderRoute);
                 WcOrder order = _orderViewModel.GetOrder();
+                if (order.status != "completed")
+                    throw new Exception($"Unexpected order status: {order.status}");
 
-                TempData["InvoiceAccrual"] = await Verify(order, simplify);
+                //TempData["InvoiceAccrual"] = await GenInvoiceAccrual(order, simplify);
+                GenInvoices(order, simplify);
             }
             catch (Exception ex)
             {
@@ -180,27 +168,50 @@ namespace FindusWebApp.Controllers
         //[Route("api/orders/invoiceaccrual")]
         public async Task<ActionResult> GetInvoiceAccrual(ulong? orderId = null, WcOrder order = null)
         {
-            if (orderId == null && order == null)
+            if (orderId != null || order != null)
             {
-                return new EmptyResult();
-            }
-            try
-            {
-                var invoice = await Verify(order);
-                return View("Partial/InvoiceAccrual", invoice);
-            }
-            catch (Exception ex)
-            {
-                ViewBag.Error = ex.Message;
+                try
+                {
+                    order = order != null ? await Get(orderId) : order;
+                    var invoice = await GenInvoiceAccrual(order);
+                    return View("Partial/InvoiceAccrual", invoice);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                }
             }
             return new EmptyResult();
+        }
+        public async Task<ActionResult> GetInvoice(ulong? orderId = null, WcOrder order = null)
+        {
+            if (orderId != null || order != null)
+            {
+                try
+                {
+                    order = order != null ? await Get(orderId) : order;
+                    var invoice = await VerifyInvoice(order);
+                    return View("DisplayTemplates/Invoice", invoice);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                }
+            }
+            return new EmptyResult();
+        }
+
+        public async Task<Invoice> VerifyInvoice(WcOrder order, decimal? currencyRate = null)
+        {
+            currencyRate ??= await GetCurrencyRate(order);
+            return VerificationUtils.GenInvoice(order, (decimal)currencyRate);
         }
 
         private async Task<bool> VerifyOrderBool(WcOrder order)
         {
             try
             {
-                return await Verify(order) != null;
+                return await GenInvoiceAccrual(order) != null;
             }
             catch (Exception ex)
             {
@@ -209,6 +220,10 @@ namespace FindusWebApp.Controllers
             }
         }
 
+        private async Task<WcOrder> Get(ulong? orderId, string orderStatus = "completed")
+        {
+            return await _wcOrderApi.GetOrder(orderId, orderStatus);
+        }
         private async Task<List<WcOrder>> Get(OrderRouteModel orderRoute)
         {
             var orders = new List<WcOrder>();
@@ -217,11 +232,11 @@ namespace FindusWebApp.Controllers
             {
                 if (orderRoute.HasDateRange())
                 {
-                    orders = await _wcOrderApi.GetOrders(orderRoute.DateFrom, orderRoute.DateTo, _memoryCache);
+                    orders = await _wcOrderApi.GetOrders(orderRoute.DateFrom, orderRoute.DateTo, _memoryCache, orderStatus: orderRoute.Status);
                 }
                 else
                 {
-                    orders.Add(await _wcOrderApi.Get(orderRoute.OrderId));
+                    orders.Add(await _wcOrderApi.GetOrder(orderRoute));
                 }
             }
             catch (Exception ex)
@@ -262,7 +277,7 @@ namespace FindusWebApp.Controllers
                 {
                     try
                     {
-                        return Verify(o).Result;
+                        return GenInvoiceAccrual(o).Result;
                     }
                     catch (Exception ex)
                     {
@@ -333,11 +348,18 @@ namespace FindusWebApp.Controllers
             return View("Summation");
         }
 
-        private async Task<InvoiceAccrual> Verify(WcOrder order, bool simplify = true)
+        private async Task<InvoiceAccrual> GenInvoiceAccrual(WcOrder order, bool simplify = true)
         {
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
             return VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
+        }
+        private async void GenInvoices(WcOrder order, bool simplify = true)
+        {
+            decimal accurateTotal = order.GetAccurateTotal();
+            decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
+            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
+            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate, accurateTotal);
         }
 
         public async Task<string> VerifyDates(ulong? orderId = null, string dateFrom = null, string dateTo = null)
@@ -348,7 +370,6 @@ namespace FindusWebApp.Controllers
             double largestDiffInHours = 0.0;
 
             var diffDayCount = new Dictionary<double, int>();
-
 
             orders.ForEach(o =>
             {
@@ -370,10 +391,126 @@ namespace FindusWebApp.Controllers
                 dateFrom = $"{DateTime.Now.AddDays(0):yyyy-MM-dd}";
                 dateTo = $"{DateTime.Now.AddDays(0):yyyy-MM-dd}";
             }
-            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
+            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo, "completed");
             var orders = await Get(orderRoute);
-            ViewData["TotalDebitForPeriod"] = $"{await Sum(orders):0.00}";
+            //ViewData["TotalDebitForPeriod"] = $"{await Sum(orders):0.00}";
             return await VerifyOrder(orders, orderRoute, simplify);
+        }
+
+        [HttpGet]
+        public async Task TestAsync(ulong? orderId = null)
+        {
+            var order = await Get(orderId);
+
+            TempData["LineItems"] = order.line_items;
+            await Call(UpdateArticles);
+
+            decimal accurateTotal = order.GetAccurateTotal();
+            decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
+            var invoice = VerificationUtils.GenInvoice(order, currencyRate);
+            TempData["Customer"] = VerificationUtils.GetCustomer(invoice, order);
+            await Call(UpdateCustomer);
+            if (TempData["CustomerNr"] is not string customerNr) throw new Exception("CustomerNr is not defined.");
+            invoice.CustomerNumber = customerNr;
+            TempData["Invoice"] = invoice;
+            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, coupons: _coupons, customerNr: customerNr);
+            await Call(CreateFortnoxInvoices);
+        }
+
+        private async Task Call(Action<FortnoxContext> action)
+        {
+            try
+            {
+                await _fortnox.FortnoxApiCall(action);
+            }
+            catch (FortnoxApiException ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+        }
+
+        private async void TryGetCustomer(FortnoxContext context)
+        {
+            var customerEmail = TempData.Peek("CustomerEmail") as string;
+            var cacheKey = $"customer-{customerEmail}";
+            if (!_memoryCache.TryGetValue(cacheKey, out string customerNr))
+            {
+                var customerCon = context.Client.CustomerConnector;
+                var customerSubsetList = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, }).Result;
+
+                if (customerSubsetList?.Entities.Count == 1)
+                {
+                    customerNr = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
+                }
+                else
+                {
+                    return;
+                }
+                _memoryCache.Set(cacheKey, customerNr, _cacheEntryOptions);
+            }
+            TempData["CustomerNr"] = customerNr;
+        }
+        private async Task<string> TryGetCustomerNr(string customerEmail)
+        {
+            TempData["CustomerEmail"] = customerEmail;
+            await Call(TryGetCustomer);
+            return TempData.Peek("CustomerNr") as string;
+        }
+
+        private async void UpdateCustomer(FortnoxContext context)
+        {
+            if (TempData["Customer"] is not Customer customer) throw new Exception("Customer is not defined.");
+            var customerNr = await TryGetCustomerNr(customer.Email);
+
+            var client = context.Client;
+            var customerConn = client.CustomerConnector;
+
+            if (customerNr != null)
+            {
+                customer.CustomerNumber = customerNr;
+                await customerConn.UpdateAsync(customer);
+            }
+            else
+            {
+                customerNr = (await customerConn.CreateAsync(customer)).CustomerNumber;
+            }
+            TempData["CustomerNr"] = customerNr;
+        }
+
+        private async void UpdateArticles(FortnoxContext context)
+        {
+            if (TempData["LineItems"] is not List<OrderLineItem> items) throw new Exception("Invoice is not defined.");
+            var articleCon = context.Client.ArticleConnector;
+            foreach (var item in items)
+            {
+                var product = await articleCon.FindAsync(new ArticleSearch { ArticleNumber = item.sku });
+                if (product?.Entities.Count == 0)
+                {
+                    await articleCon.CreateAsync(new Article
+                    {
+                        ArticleNumber = item.sku,
+                        Type = ArticleType.Stock,
+                        Description = item.name
+                    });
+                }
+            }
+        }
+
+        private async void CreateFortnoxInvoices(FortnoxContext context)
+        {
+            if (TempData["Invoice"] is not Invoice invoice) throw new Exception("Invoice is not defined.");
+            if (TempData["InvoiceAccrual"] is not InvoiceAccrual invoiceAccrual) throw new Exception("InvoiceAccrual is not defined.");
+
+            var invoiceCon = context.Client.InvoiceConnector;
+            var invoiceAccCon = context.Client.InvoiceAccrualConnector;
+
+            if ((await invoiceCon.FindAsync(new InvoiceSearch { YourOrderNumber = invoice.YourOrderNumber }))?.Entities.Count != 0)
+                throw new Exception($"Faktura för order {invoice.YourOrderNumber} finns redan i Fortnox");
+
+            invoice = await invoiceCon.CreateAsync(invoice);
+
+            //invoiceAccrual.InvoiceNumber = invoice.DocumentNumber;
+            //await invoiceAccCon.CreateAsync(invoiceAccrual);
         }
     }
 }

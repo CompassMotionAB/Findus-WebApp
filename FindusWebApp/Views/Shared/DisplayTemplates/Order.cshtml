@@ -13,11 +13,11 @@
 
 @if (@Model != null)
 {
-    <h2>Customer</h2>
+    <h2>Kund</h2>
     <table>
     <tr>
-        <th style="width: 30%;">Customer Country (shipping)</th>
-        <th>Customer Email</th>
+        <th style="width: 30%;">Land</th>
+        <th>Email</th>
     </tr>
     <tr>
         <td>@Model.shipping.country</td>
@@ -25,12 +25,12 @@
     </tr>
 </table>
     <br />
-    <h2>Order</h2>
+    <h2>Beställning</h2>
     <table>
     <tr>
         <th>Status</th>
-        <th>Currency</th>
-        <th>Payment Method</th>
+        <th>Valuta</th>
+        <th>Betalningsmetod</th>
     </tr>
     <tr>
         <td>@Model.status</td>

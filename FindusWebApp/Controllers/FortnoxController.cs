@@ -13,6 +13,8 @@ using System.Net;
 using Microsoft.Extensions.Caching.Memory;
 using System.Reflection;
 using System.Net.Http;
+using Fortnox.SDK.Search;
+using Fortnox.SDK.Interfaces;
 
 namespace FindusWebApp.Controllers
 {
@@ -158,11 +160,6 @@ namespace FindusWebApp.Controllers
         }
 
         #region HelperMethods
-        public async Task<IActionResult> CreateCustomer()
-        {
-            await Call(CreateNewCustomer);
-            return View("Fortnox");
-        }
         public async Task<IActionResult> CreateInvoice(string customerNr)
         {
             TempData["CustomerNr"] = customerNr;
@@ -170,22 +167,13 @@ namespace FindusWebApp.Controllers
             return View("Fortnox");
         }
 
-        private void CreateNewCustomer(FortnoxContext context)
-        {
-            var client = context.Client;
-            var customerConn = client.CustomerConnector;
-            var rnd = new Random();
-            var newCust = new Customer
-            {
-                Name = "Testing" + rnd.NextDouble(),
-                OurReference = "Testing" + rnd.NextDouble(),
-                YourReference = "Testing" + rnd.NextDouble()
-            };
-            var customer = customerConn.CreateAsync(newCust).Result;
 
-            ViewData["CustomerInfo"] = "Customer with ID: " + customer.CustomerNumber + " created successfully.";
-            ViewData["CustomerNr"] = customer.CustomerNumber;
+        public void GetCustomer(FortnoxContext context) {
+            var customerEmail =  TempData.Peek("CustomerEmail") as string;
+            var customerCon = context.Client.CustomerConnector;
+            TempData["CustomerSubset"] = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
         }
+        
 
         private void CreateNewInvoice(FortnoxContext context)
         {

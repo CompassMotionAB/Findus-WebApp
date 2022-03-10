@@ -4,8 +4,8 @@
 
 @{
     //var Order = TempData["order"] as WooCommerceNET.WooCommerce.v2.Order;
-    var Invoice = TempData["invoice"] as Fortnox.SDK.Entities.Invoice;
-    var InvoiceAccrual = TempData["invoiceAccrual"] as Fortnox.SDK.Entities.InvoiceAccrual;
+    var Invoice = TempData["Invoice"] as Fortnox.SDK.Entities.Invoice;
+    var InvoiceAccrual = TempData["InvoiceAccrual"] as Fortnox.SDK.Entities.InvoiceAccrual;
 
     var Order = @Model != null ? @Model.Order : null;
     var OrderSelect = @Model != null ? @Model.OrderSelect : null;
@@ -22,15 +22,19 @@
     <div class="center-block">
         @Html.Partial("Partial/DateRangePicker")
     </div>
-        <span>Totala Debet:en för Period: @Html.Raw(TotalDebit) Kr</span>
-    @if (@OrderSelect != null)
+    @if (@Model != null && Model.Orders?.Count != 1)
     {
-        @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @style="width: auto;",
+
+        <span>Totala Debet:en för Period: @Html.Raw(TotalDebit) Kr</span>
+        @if (@OrderSelect != null)
+        {
+            @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @style="width: auto;",
     @onchange="changeOrder(this)" })
-        <a asp-controller="Findus" asp-action=@(Verification ? "Order" : "Verification")
+            <a asp-controller="Findus" asp-action=@(Verification ? "Order" : "Verification")
         asp-all-route-data="@Model.OrderRouteData">
-            @(Verification ? "Gå till Order" : "Verifiera Order")
-        </a>
+                @(Verification ? "Gå till Order" : "Verifiera Order")
+            </a>
+        }
     }
 
     @if (@Order != null)
@@ -53,6 +57,7 @@
             }
             @if (@InvoiceAccrual != null)
             {
+                <div class="horizontal-divider"></div>
                 @Html.DisplayFor(m => @InvoiceAccrual)
             }
 
