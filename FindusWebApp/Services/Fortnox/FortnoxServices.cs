@@ -36,7 +36,8 @@ namespace FindusWebApp.Services.Fortnox
             return _token.RefreshToken;
         }
 
-        public void OnActionExecuting(ActionExecutingContext context) {
+        public void OnActionExecuting(ActionExecutingContext context)
+        {
             throw new NotImplementedException();
         }
         public void OnActionExecuted(ActionExecutedContext context)
@@ -79,14 +80,18 @@ namespace FindusWebApp.Services.Fortnox
                 // TODO: use Authorization Policy middleware
                 if ((ex.InnerException as FortnoxApiException)?.ResponseContent == "{\"message\":\"unauthorized\"}")
                 {
-                    await RefreshTokens(apiCallFunction);
-                }
-                else
-                {
-                    // TODO: For now, assumes faulty token and removes it
-                    _tokens.Token.RemoveRange(_tokens.Token);
-                    await _tokens.SaveChangesAsync();
-                    throw new Exception(message: ex.Message);
+                    try
+                    {
+                        await RefreshTokens(apiCallFunction);
+                    }
+                    catch (Exception)
+                    {
+                        // TODO: For now, assumes faulty token and removes it
+                        //throw new Exception(message: ex.Message);
+                        _tokens.Token.RemoveRange(_tokens.Token);
+                        await _tokens.SaveChangesAsync();
+
+                    }
                 }
             }
         }
