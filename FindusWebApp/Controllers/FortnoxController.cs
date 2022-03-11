@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using FindusWebApp.Services.Fortnox;
@@ -31,10 +31,11 @@ namespace FindusWebApp.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        public async Task<IActionResult> IndexAsync()
+        public async Task<IActionResult> IndexAsync(string customerNr = null)
         {
             await Call(FetchCompanyName);
             // NOTE: Will redirect to "/Connect/Login" if Fornox is not authenticated:
+            TempData["CustomerNr"] = customerNr;
             return await CallRedirect(GetCustomersPage);
         }
         private async Task Call(Action<FortnoxContext> action)
@@ -126,7 +127,7 @@ namespace FindusWebApp.Controllers
             TempData["CacheKey"] = "CustomerPage";
             var customerNr = TempData.Peek("CustomerNr") as string;
             await FetchAsync<CustomerSubset>(customerNr);
-            if(!string.IsNullOrEmpty(customerNr))
+            if (!string.IsNullOrEmpty(customerNr))
                 await FetchAsync<InvoiceSubset>(customerNr);
             TempData.Remove("CacheKey");
         }

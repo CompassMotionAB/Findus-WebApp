@@ -504,7 +504,7 @@ namespace Findus.Helpers
                 Address2 = invoice.Address2,
                 City = invoice.City,
 
-                YourReference = order.customer_id.ToString(),
+                YourReference = order.customer_id != 0 ? order.customer_id.ToString() : null,
 
                 DeliveryName = invoice.DeliveryName,
                 DeliveryAddress1 = invoice.DeliveryAddress1,

@@ -14,15 +14,11 @@ namespace FindusWebApp.Extensions
         {
             var searchSettings = new InvoiceSearch
             {
-                // CustomerNumber = customerId,
+                CustomerNumber = customerNr,
                 Limit = maxPerPage,
                 SortBy = Sort.By.Invoice.InvoiceDate,
                 SortOrder = Sort.Order.Ascending
             };
-
-            if(!String.IsNullOrEmpty(customerNr)) {
-                searchSettings.CustomerNumber = customerNr;
-            }
 
             var largeInvoiceCollection = await connector.FindAsync(searchSettings);
             var totalInvoices = largeInvoiceCollection.TotalResources;
