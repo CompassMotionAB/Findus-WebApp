@@ -90,7 +90,6 @@ namespace FindusWebApp.Services.Fortnox
                         //throw new Exception(message: ex.Message);
                         _tokens.Token.RemoveRange(_tokens.Token);
                         await _tokens.SaveChangesAsync();
-
                     }
                 }
             }

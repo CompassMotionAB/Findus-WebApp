@@ -10,7 +10,7 @@
     <tr>
         <th></th>
         <th>SKU</th>
-        <th>Kostnad</th>
+        <th>Kostnad</th><span>(Inkl. Moms)</span>
         <th>Kvantitet</th>
     </tr>
     @foreach (var row in @Model)
@@ -18,7 +18,7 @@
             <tr>
                 <td style="background-color: lightgreen;"></td>
                 <td>@row.ArticleNumber</td>
-                <td>@($"{row.Price:F2}")</td><span>(Inkl. Moms)</span>
+                <td>@($"{row.Price:F2}")</td>
                 <td>@row.DeliveredQuantity</td>
             </tr>
         }
