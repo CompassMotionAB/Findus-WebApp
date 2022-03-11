@@ -398,23 +398,79 @@ namespace FindusWebApp.Controllers
         }
 
         [HttpGet]
-        public async Task TestAsync(ulong? orderId = null)
+        public async Task<IActionResult> SendToFortnox(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
-            var order = await Get(orderId);
+            try
+            {
+                var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
+                if (orderRoute.HasDateRange())
+                {
+                    var orders = await Get(orderRoute);
+                    foreach (var order in orders)
+                    {
+                        await SendToFortnox(order);
+                    }
+                }
+                else
+                {
+                    var order = await Get(orderId);
+                    await SendToFortnox(order);
+                }
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            return View("Findus");
+        }
+        private async Task<IActionResult> SendToFortnox(WcOrder order)
+        {
+            //await Call(DEBUGCreateFinancialYear);
 
-            TempData["LineItems"] = order.line_items;
-            await Call(UpdateArticles);
 
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
             var invoice = VerificationUtils.GenInvoice(order, currencyRate);
-            TempData["Customer"] = VerificationUtils.GetCustomer(invoice, order);
-            await Call(UpdateCustomer);
-            if (TempData["CustomerNr"] is not string customerNr) throw new Exception("CustomerNr is not defined.");
+            TempData["Customer"] = invoice.GetCustomer(order);
+            //await Call(UpdateCustomer);
+            await _fortnox.FortnoxApiCall(UpdateCustomer);
+            var customerNr = TempData["CustomerNr"] as string;
+            if (String.IsNullOrEmpty(customerNr)) throw new Exception($"Failed to update customer: {order.billing.email} for order id: {order.id}.");
+
+            TempData["LineItems"] = order.line_items;
+            await Call(UpdateArticles);
+
             invoice.CustomerNumber = customerNr;
             TempData["Invoice"] = invoice;
             TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, coupons: _coupons, customerNr: customerNr);
-            await Call(CreateFortnoxInvoices);
+            //await Call(CreateFortnoxInvoices);
+            return View("Findus");
+        }
+
+        private async void DEBUGCreateFinancialYear(FortnoxContext context)
+        {
+            var FromDate = new DateTime(2022, 1, 1);
+            var ToDate = new DateTime(2023, 1, 1).AddTicks(-1);
+            try
+            {
+                var yearSubsetList = await context.Client.FinancialYearConnector.FindAsync(
+                    new FinancialYearSearch
+                    {
+                        Date = FromDate,
+                        //FromDate = FromDate, 
+                        //ToDate = ToDate
+                    });
+            }
+            catch (Exception ex)
+            {
+                await context.Client.FinancialYearConnector.CreateAsync(new FinancialYear
+                {
+                    FromDate = FromDate,
+                    ToDate = ToDate,
+                    AccountingMethod = AccountingMethod.Accrual,
+                    AccountChartType = "BAS 2022"
+                });
+            }
         }
 
         private async Task Call(Action<FortnoxContext> action)
@@ -432,23 +488,26 @@ namespace FindusWebApp.Controllers
         private async void TryGetCustomer(FortnoxContext context)
         {
             var customerEmail = TempData.Peek("CustomerEmail") as string;
-            var cacheKey = $"customer-{customerEmail}";
-            if (!_memoryCache.TryGetValue(cacheKey, out string customerNr))
+            try
             {
                 var customerCon = context.Client.CustomerConnector;
-                var customerSubsetList = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, }).Result;
+                var customerSubsetList = await customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
 
                 if (customerSubsetList?.Entities.Count == 1)
                 {
-                    customerNr = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
-                }
-                else
-                {
+                    TempData["CustomerNr"] = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
                     return;
                 }
-                _memoryCache.Set(cacheKey, customerNr, _cacheEntryOptions);
+                else if (customerSubsetList?.Entities.Count > 1)
+                {
+                    throw new Exception("Flera kunder med samma Email existerar i Fortnox.");
+                }
             }
-            TempData["CustomerNr"] = customerNr;
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            TempData["CustomerNr"] = null;
         }
         private async Task<string> TryGetCustomerNr(string customerEmail)
         {
@@ -468,11 +527,23 @@ namespace FindusWebApp.Controllers
             if (customerNr != null)
             {
                 customer.CustomerNumber = customerNr;
-                await customerConn.UpdateAsync(customer);
+                try
+                {
+                    await customerConn.UpdateAsync(customer);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                }
             }
             else
             {
-                customerNr = (await customerConn.CreateAsync(customer)).CustomerNumber;
+                var newCustomer = await customerConn.CreateAsync(customer);
+                customerNr = newCustomer.CustomerNumber;
+                if (string.IsNullOrEmpty(customerNr))
+                {
+                    throw new Exception($"Failed to create new Customer: {customer.Email}");
+                }
             }
             TempData["CustomerNr"] = customerNr;
         }
@@ -490,7 +561,7 @@ namespace FindusWebApp.Controllers
                     {
                         ArticleNumber = item.sku,
                         Type = ArticleType.Stock,
-                        Description = item.name
+                        Description = item.name.Replace('|', '-')
                     });
                 }
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using FindusWebApp.Services.Fortnox;
@@ -168,13 +168,31 @@ namespace FindusWebApp.Controllers
             return View("Fortnox");
         }
 
+        [HttpGet]
+        public async Task<ActionResult> DeleteCustomer(string customerNr)
+        {
+            TempData["CustomerNr"] = customerNr;
+            try {
+                await Call(DeleteCustomerAsync);
+            } catch (Exception ex) {
+                ViewBag.Error = ex.Message;
+                return View("Fortnox");
+            }
+            return RedirectToAction("Index");
+        }
 
-        public void GetCustomer(FortnoxContext context) {
-            var customerEmail =  TempData.Peek("CustomerEmail") as string;
+        private async void DeleteCustomerAsync(FortnoxContext context)
+        {
+            var customerNr = TempData["CustomerNr"] as string;
+            if (String.IsNullOrEmpty(customerNr)) throw new Exception("Missing CustomerNr in TempData");
+            await context.Client.CustomerConnector.DeleteAsync(customerNr);
+        }
+        public void GetCustomer(FortnoxContext context)
+        {
+            var customerEmail = TempData.Peek("CustomerEmail") as string;
             var customerCon = context.Client.CustomerConnector;
             TempData["CustomerSubset"] = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
         }
-        
 
         private void CreateNewInvoice(FortnoxContext context)
         {

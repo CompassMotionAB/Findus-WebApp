@@ -51,9 +51,14 @@
                 <td>@customer.Name</td>
                 <td>@customer.City</td>
     <td>
-        <input type='checkbox' value='false' 
+        <a asp-controller="Fortnox" asp-action="DeleteCustomer" asp-route-customerNr="@customer.CustomerNumber">
+            <div>
+                <input type="submit" name="invoiceBtn" value="Delete Customer" />
+            </div>
+        </a>
+        @* <input type='checkbox' value='false' 
             id='CheckBoxes_@(customer.CustomerNumber)'
-            name='CheckBoxes[@customer.CustomerNumber]' />
+            name='CheckBoxes[@customer.CustomerNumber]' /> *@
     </td>
             </tr>
             @if (Invoices != null)
