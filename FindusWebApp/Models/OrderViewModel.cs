@@ -92,23 +92,23 @@ namespace FindusWebApp.Models
 
         public bool HasInvoice(string orderId)
         {
-            var match = InvoiceAccruals
+            var match = InvoiceAccruals?
                 .FirstOrDefault(o => o.Key.ToString() == orderId);
-            return match.Value != null;
+            return match?.Value != null;
             //return !match.Equals(default(KeyValuePair<ulong?, InvoiceAccrual>)) && match.Value != null;
         }
         public string GetError(string orderId)
         {
-            return Errors.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return Errors?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
         public InvoiceAccrual GetInvoice(string orderId)
         {
-            return InvoiceAccruals.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return InvoiceAccruals?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
         public WcOrder GetOrder(string orderId = null)
         {
             if (string.IsNullOrEmpty(orderId)) return null;
-            return Orders.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return Orders?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
 
         public void SetCurrentId(ulong? id)
