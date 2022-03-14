@@ -180,13 +180,13 @@ namespace Findus.Helpers
 
             var invoiceRows = new List<InvoiceRow>();
             // Assuming Product/Article exists in Fortnox
-            order.line_items.ForEach( i =>
-                invoiceRows.Add(new InvoiceRow
-                {
-                    Price = i.GetTotalWithTax() * currencyRate,
-                    ArticleNumber = i.sku,
-                    DeliveredQuantity = i.quantity,
-                })
+            order.line_items.ForEach(i =>
+               invoiceRows.Add(new InvoiceRow
+               {
+                   Price = i.GetTotalWithTax() * currencyRate,
+                   ArticleNumber = i.sku,
+                   DeliveredQuantity = i.quantity,
+               })
             );
 
             return new Invoice()
@@ -272,7 +272,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null)
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = "MONTHLY")
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -493,8 +493,10 @@ namespace Findus.Helpers
             return invoice;
         }
 
-        public static Customer GetCustomer(this Invoice invoice, WcOrder order) {
-            return new Customer {
+        public static Customer GetCustomer(this Invoice invoice, WcOrder order)
+        {
+            return new Customer
+            {
                 Name = invoice.CustomerName,
 
                 Email = order.billing.email,
@@ -514,7 +516,8 @@ namespace Findus.Helpers
             };
         }
 
-        public static Customer GenCustomer(Invoice invoice, WcOrder order){
+        public static Customer GenCustomer(Invoice invoice, WcOrder order)
+        {
             return invoice.GetCustomer(order);
         }
 
@@ -623,13 +626,29 @@ namespace Findus.Helpers
             return inv;
         }
 
+        public static VerificationModel Verify(WcOrder order, AccountsModel accounts, decimal currencyRate, bool simplify = false, dynamic coupons = null)
+        {
+            var result = new VerificationModel() {
+                OrderId = order.id,
+                OrderItems = order.line_items
+            };
+            try
+            {
+                var accurateTotal = order.GetAccurateTotal();
+                result.InvoiceAccrual = GenInvoiceAccrual(order, accounts, currencyRate, accurateTotal, simplify, coupons: coupons);
+                result.Invoice = GenInvoice(order, currencyRate);
+                result.Customer = GetCustomer(result.Invoice, order);
+            }
+            catch (Exception ex)
+            {
+                result.Error = ex.Message;
+            }
+            return result;
+        }
+
         public static decimal GetTaxRate(this OrderTaxLine taxLine)
         {
-            var taxLabel = taxLine.rate_code switch
-            {
-                /*"IE-FOOD & BEVERAGE-1" => "%25 Vat",*/
-                _ => taxLine.label
-            };
+            var taxLabel = taxLine.label;
             try
             {
                 return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
