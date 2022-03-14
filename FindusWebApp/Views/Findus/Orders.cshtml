@@ -51,8 +51,8 @@
                 </tr>
                 @foreach (var order in Model.OrderSelect)
                 {
-                    var invoice = @Model.GetInvoice(order.Value);
                     string error = @Model.GetError(order.Value);
+                    var invoice = error != null ? @Model.GetInvoice(order.Value) : null;
 
                     <tr>
                         <td style="width: 40px">
@@ -69,7 +69,7 @@
                         <td></td>
                             <td colspan="999">
                                 <div style="display:none" id="inv-@order.Value">
-                                    @if(error == null) {
+                                    @if(invoice != null) {
                                         @Html.Partial("Partial/InvoiceAccrual", invoice)
                                     } else {
                                         @Html.Partial("DisplayTemplates/Order", @Model.GetOrder(order.Value))
