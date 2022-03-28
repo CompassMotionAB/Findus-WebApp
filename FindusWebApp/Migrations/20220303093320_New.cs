@@ -17,10 +17,7 @@ namespace FindusWebApp.Migrations
                     RefreshToken = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     ScopeHash = table.Column<int>(type: "INTEGER", nullable: false)
                 },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Token", x => x.RealmId);
-                });
+                constraints: table => table.PrimaryKey("PK_Token", x => x.RealmId));
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

@@ -92,10 +92,8 @@ namespace FindusWebApp.Models
 
         public bool HasInvoice(string orderId)
         {
-            var match = InvoiceAccruals
-                .FirstOrDefault(o => o.Key.ToString() == orderId);
+            var match = InvoiceAccruals.FirstOrDefault(o => o.Key.ToString() == orderId);
             return match.Value != null;
-            //return !match.Equals(default(KeyValuePair<ulong?, InvoiceAccrual>)) && match.Value != null;
         }
         public string GetError(string orderId)
         {
@@ -110,7 +108,6 @@ namespace FindusWebApp.Models
             if (string.IsNullOrEmpty(orderId)) return null;
             return Orders.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
-
         public void SetCurrentId(ulong? id)
         {
             OrderRoute.OrderId = id;

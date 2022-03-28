@@ -2,7 +2,6 @@ using System;
 
 namespace FindusWebApp.Helpers
 {
-
     public static class HttpUtilities
     {
         public static int GetNeededPages(int pageSize, int maxPerPage, int totalItems)
