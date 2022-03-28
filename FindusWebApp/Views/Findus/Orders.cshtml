@@ -47,12 +47,14 @@
                 <tr>
                     <th></th>
                     <th scope="col">Order</th>
+                    <th></th>
                     <th scope="col">Select</th>
                 </tr>
                 @foreach (var order in Model.OrderSelect)
                 {
-                    var invoice = @Model.GetInvoice(order.Value);
-                    string error = @Model.GetError(order.Value);
+                    string warning = @Model.GetWarning(order.Value);
+                    string error = warning == null ? @Model.GetError(order.Value) : null;
+                    var invoice = error != null ? @Model.GetInvoice(order.Value) : null;
 
                     <tr>
                         <td style="width: 40px">
@@ -62,6 +64,12 @@
                         <td>
                             @Html.ActionLink(order.Text,"Verification", "Findus", new {orderId = order.Value})
                             <div class="text-danger">@Html.Raw(System.Web.HttpUtility.HtmlEncode(error))</div>
+                            <div class="text-warning">@Html.Raw(System.Web.HttpUtility.HtmlEncode(warning))</div>
+                        </td>
+                        <td>
+                            @if(warning == null && error == null) {
+                                @Html.ActionLink("Send to Fortnox","SendToFortnox", "Findus", new {orderId = order.Value})
+                            }
                         </td>
                         <td><input type='checkbox' value='false' /></td>
                     </tr>
@@ -69,7 +77,7 @@
                         <td></td>
                             <td colspan="999">
                                 <div style="display:none" id="inv-@order.Value">
-                                    @if(error == null) {
+                                    @if(invoice != null) {
                                         @Html.Partial("Partial/InvoiceAccrual", invoice)
                                     } else {
                                         @Html.Partial("DisplayTemplates/Order", @Model.GetOrder(order.Value))

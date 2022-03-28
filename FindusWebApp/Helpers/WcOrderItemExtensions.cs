@@ -16,7 +16,7 @@ namespace FindusWebApp.Helpers
     public static class WcOrderItemExtensions
     {
         private static readonly MemoryCacheEntryOptions _orderCacheOptions = new MemoryCacheEntryOptions()
-                                    .SetSlidingExpiration(TimeSpan.FromHours(8));
+                                    .SetSlidingExpiration(TimeSpan.FromMinutes(30));
 
         private static async Task<List<WcOrder>> GetPage(this WCObject.WCOrderItem wcOrderApi, DateTime? dateAfter = null, DateTime? dateBefore = null, int pageNumber = 1, int itemPerPage = 100, string dateStr = null, string orderStatus = "completed")
         {

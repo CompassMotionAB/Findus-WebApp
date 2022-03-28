@@ -3,7 +3,8 @@
 
 @{
     Layout = null;
-    var Invoices = TempData["InvoiceSubset"] as InvoiceSubset[];
+    var Invoices = TempData["InvoiceSubset"] as List<InvoiceSubset>;
+    var AccrualInvoices = TempData["InvoiceAccluarSubset"] as List<InvoiceAccrualSubset>;
     bool CustomerPage = (TempData["CustomerNr"] as String) != null;
 
     var CheckBoxes = new Dictionary<string, bool>();
@@ -50,11 +51,15 @@
                 </td>
                 <td>@customer.Name</td>
                 <td>@customer.City</td>
-    <td>
-        <input type='checkbox' value='false' 
-            id='CheckBoxes_@(customer.CustomerNumber)'
-            name='CheckBoxes[@customer.CustomerNumber]' />
-    </td>
+        @if(Invoices == null || Invoices.Count == 0 || !Invoices.Any(i => i.CustomerNumber == @customer.CustomerNumber)) {
+        <td>
+            <a asp-controller="Fortnox" asp-action="DeleteCustomer" asp-route-customerNr="@customer.CustomerNumber">
+                <div>
+                    <input type="submit" name="invoiceBtn" value="Delete Customer" />
+                </div>
+            </a>
+        </td>
+        }
             </tr>
             @if (Invoices != null)
             {

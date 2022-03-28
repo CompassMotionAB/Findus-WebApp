@@ -35,6 +35,22 @@ namespace FindusWebApp.Extensions
             }
             return mergedCollection;
         }
+        public static async Task<IList<InvoiceAccrualSubset>> GetAccrualInvoices(this IInvoiceAccrualConnector connector, DateTime fromDate, DateTime toDate, int pageNr = 1, int maxPerPage = 20)
+        {
+            var searchSettings = new InvoiceAccrualSearch
+            {
+                Page = pageNr,
+                Limit = maxPerPage,
+                FinancialYearDate = fromDate,
+                //SortOrder = Sort.Order.Ascending,
+                //FromDate = fromDate,
+                //ToDate = toDate,
+            };
+
+            var collection =  await connector.FindAsync(searchSettings);
+            if(collection == null) throw new Exception("Unexpected return result from Invoice Accrual FindAsync()");
+            return collection.Entities;
+        }
         public static async Task<List<CustomerSubset>> GetCustomers(this ICustomerConnector connector, string customerNr = null, int minPerPage = 5, int maxPerPage = 20)
         {
             var searchSettings = new CustomerSearch

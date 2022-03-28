@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using FindusWebApp.Services.Fortnox;
@@ -93,31 +93,52 @@ namespace FindusWebApp.Controllers
             var customerNr = TempData["CustomerNr"] as string;
             TempData["InvoiceSubset"] = context.Client.InvoiceConnector.GetInvoices(customerNr).Result;
         }
+        private void FetchAccrualInvoices(FortnoxContext context)
+        {
+            var fromDate = TempData["FromDate"] as string;
+            var toDate = TempData["ToDate"] as string;
+            TempData["InvoiceAccrualSubset"] = context
+                .Client
+                .InvoiceAccrualConnector
+                .GetAccrualInvoices(
+                    DateTime.Parse(fromDate),
+                    DateTime.Parse(toDate))
+                .Result;
+        }
 
-        private async Task FetchAsync<TEntitySubset>(string customerNr)
+        private async Task FetchAsync<TEntitySubset>(string customerNr, string fromDate = null, string toDate = null)
         {
             string entityName = typeof(TEntitySubset)?.Name;
 
             TempData["CustomerNr"] = customerNr;
-            var cacheKey = customerNr ?? TempData.Peek("CacheKey") as string;
-            cacheKey += "-" + entityName;
+            var cacheKey = TempData.Peek("CacheKey") as string;
+            if (string.IsNullOrEmpty(cacheKey))
+            {
+                cacheKey = entityName + "_" + (customerNr ?? $"{fromDate}_{toDate}");
+            }
             if (!_memoryCache.TryGetValue(cacheKey, out object entities) || entities == null)
             {
-                var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(8));
+                var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromSeconds(5));
                 if (entityName == "InvoiceSubset")
                 {
                     await Call(FetchInvoices);
-                    _memoryCache.Set(cacheKey, TempData.Peek("InvoiceSubset"), cacheEntryOptions);
                 }
                 else if (entityName == "CustomerSubset")
                 {
                     await Call(FetchCustomers);
-                    _memoryCache.Set(cacheKey, TempData.Peek("CustomerSubset"), cacheEntryOptions);
+                }
+                else if (entityName == "InvoiceAccrualSubset")
+                {
+                    if (string.IsNullOrEmpty(fromDate) || string.IsNullOrEmpty(toDate)) throw new Exception("Missing to/from date for fetching Invoice Accruals");
+                    TempData["FromDate"] = fromDate;
+                    TempData["ToDate"] = toDate;
+                    await Call(FetchAccrualInvoices);
                 }
                 else
                 {
                     throw new ArgumentException("Unexpected type: " + entityName ?? nameof(TEntitySubset));
                 }
+                _memoryCache.Set(cacheKey, TempData.Peek(entityName), cacheEntryOptions);
                 return;
             }
             TempData[entityName] = entities;// as TEntitySubset[];
@@ -141,6 +162,19 @@ namespace FindusWebApp.Controllers
             var client = context.Client;
             var conn = client.CompanyInformationConnector;
             ViewData["CompanyName"] = conn.GetAsync().Result.CompanyName;
+        }
+
+        public async Task<ActionResult> InvoiceAccruals(string dateFrom = null, string dateTo = null)
+        {
+            try
+            {
+                await FetchAsync<InvoiceAccrualSubset>(null, dateFrom, dateTo);
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            return View("InvoiceAccruals");
         }
 
         [HttpGet]
@@ -168,13 +202,34 @@ namespace FindusWebApp.Controllers
             return View("Fortnox");
         }
 
+        [HttpGet]
+        public async Task<ActionResult> DeleteCustomer(string customerNr)
+        {
+            TempData["CustomerNr"] = customerNr;
+            try
+            {
+                await Call(DeleteCustomerAsync);
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+                return View("Fortnox");
+            }
+            return RedirectToAction("Index");
+        }
 
-        public void GetCustomer(FortnoxContext context) {
-            var customerEmail =  TempData.Peek("CustomerEmail") as string;
+        private async void DeleteCustomerAsync(FortnoxContext context)
+        {
+            var customerNr = TempData["CustomerNr"] as string;
+            if (String.IsNullOrEmpty(customerNr)) throw new Exception("Missing CustomerNr in TempData");
+            await context.Client.CustomerConnector.DeleteAsync(customerNr);
+        }
+        public void GetCustomer(FortnoxContext context)
+        {
+            var customerEmail = TempData.Peek("CustomerEmail") as string;
             var customerCon = context.Client.CustomerConnector;
             TempData["CustomerSubset"] = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
         }
-        
 
         private void CreateNewInvoice(FortnoxContext context)
         {
