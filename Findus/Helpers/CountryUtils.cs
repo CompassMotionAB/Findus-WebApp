@@ -3,7 +3,6 @@ using System.Globalization;
 
 namespace Findus.Helpers
 {
-
     public static class CountryUtils
     {
         public static string GetEnglishName(string countryCode)
@@ -12,7 +11,7 @@ namespace Findus.Helpers
             {
                 return new RegionInfo(countryCode).EnglishName;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return $"Missing English Name: {countryCode}";
             }

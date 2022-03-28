@@ -72,16 +72,6 @@ namespace FindusWebApp.Controllers
             return View("Fortnox");
         }
 
-        /*
-        private async Task FetchCustomersAndInvoicesAsync(string customerNr)
-        {
-            var cacheKey = customerNr ?? "0";
-            var invoices = await FetchInvoicesAsync(customerNr);
-            var customers = await FetchCustomersAsync(customerNr);
-            _customerInvoices = invoices.GroupBy(
-                i => i.CustomerNumber).ToDictionary(t => t.Key, grp => grp.ToArray());
-        }
-        */
         private void FetchCustomers(FortnoxContext context)
         {
             var customerNr = TempData["CustomerNr"] as string;
@@ -147,9 +137,7 @@ namespace FindusWebApp.Controllers
         {
             try
             {
-                //TempData["CustomerNr"] = customerNr;
                 await FetchAsync<InvoiceSubset>(customerNr);
-                //await Call(FetchInvoices);
                 return View("Partial/InvoiceSubsetList", TempData["InvoiceSubset"]);
             }
             catch (Exception ex)
@@ -158,49 +146,5 @@ namespace FindusWebApp.Controllers
             }
             return new EmptyResult();
         }
-
-        #region HelperMethods
-        public async Task<IActionResult> CreateInvoice(string customerNr)
-        {
-            TempData["CustomerNr"] = customerNr;
-            await Call(CreateNewInvoice);
-            return View("Fortnox");
-        }
-
-
-        public void GetCustomer(FortnoxContext context) {
-            var customerEmail =  TempData.Peek("CustomerEmail") as string;
-            var customerCon = context.Client.CustomerConnector;
-            TempData["CustomerSubset"] = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
-        }
-        
-
-        private void CreateNewInvoice(FortnoxContext context)
-        {
-            var customerNr = TempData["CustomerNr"] as string;
-            if (String.IsNullOrEmpty(customerNr)) throw new Exception("Invalid Customer Number.");
-
-            var client = context.Client;
-
-            var tmpArticle = client.ArticleConnector.CreateAsync(new Article() { Description = "TmpArticle", Type = ArticleType.Stock, PurchasePrice = 100 }).Result;
-            var newInvoice = new Invoice()
-            {
-                CustomerNumber = customerNr,
-                InvoiceDate = new DateTime(2019, 1, 20),
-                DueDate = new DateTime(2022, 2, 20),
-                InvoiceType = InvoiceType.CashInvoice,
-                PaymentWay = PaymentWay.Cash,
-                Comments = "TestInvoice",
-                InvoiceRows = new List<InvoiceRow>()
-                {
-                    new InvoiceRow(){ ArticleNumber = tmpArticle.ArticleNumber, DeliveredQuantity = 10, Price = 100},
-                    new InvoiceRow(){ ArticleNumber = tmpArticle.ArticleNumber, DeliveredQuantity = 20, Price = 100},
-                    new InvoiceRow(){ ArticleNumber = tmpArticle.ArticleNumber, DeliveredQuantity = 15, Price = 100}
-                }
-            };
-            newInvoice = client.InvoiceConnector.CreateAsync(newInvoice).Result;
-            ViewData["InvoiceInfo"] = "Invoice with ID: " + newInvoice.DocumentNumber + " created successfully.";
-        }
-        #endregion
     }
 }

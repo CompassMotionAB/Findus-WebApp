@@ -172,11 +172,11 @@ namespace Findus.Helpers
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
 
-        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, decimal? accurateTotal = null, string customerNr = null)
+        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, string customerNr = null)
         {
             if (order.date_paid == null) throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1) throw new Exception($"Order Id: {order.id} is missing items in order");
-            if (order.currency.ToUpper() != "EUR") throw new Exception($"Expected WooCommerce order to be in EUR");
+            if (!string.Equals(order.currency, "EUR", StringComparison.OrdinalIgnoreCase)) throw new Exception("Expected WooCommerce order to be in EUR");
 
             var invoiceRows = new List<InvoiceRow>();
             // Assuming Product/Article exists in Fortnox
@@ -311,7 +311,6 @@ namespace Findus.Helpers
                 CustomerNumber = customerNr,
                 InvoiceNumber = invoiceNr,
                 Period = period,
-
 
                 Order = order,
                 CountryIso = countryIso,
@@ -634,7 +633,7 @@ namespace Findus.Helpers
             {
                 return decimal.Parse(taxLabel[..taxLabel.IndexOf("%")]) / 100.0M;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw new Exception($"Received unsupported Tax label from WooCommerce: {taxLabel}");
             }
