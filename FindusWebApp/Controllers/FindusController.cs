@@ -510,7 +510,7 @@ namespace FindusWebApp.Controllers
                         Date = FromDate,
                     });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await context.Client.FinancialYearConnector.CreateAsync(new FinancialYear
                 {
@@ -534,7 +534,7 @@ namespace FindusWebApp.Controllers
             }
         }
 
-        private void TryGetCustomer(FortnoxContext context)
+        private async void TryGetCustomer(FortnoxContext context)
         {
             var customerEmail = TempData.Peek("CustomerEmail") as string;
             try
@@ -687,7 +687,7 @@ namespace FindusWebApp.Controllers
                 //invoiceAccrual.InvoiceNumber = invoice.DocumentNumber;
                 //await invoiceAccCon.CreateAsync(invoiceAccrual);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //throw new Exception($"Failed to search for invoice for Order Id:{invoice.YourOrderNumber}");
                 //ViewBag.Error = ex.InnerException?.Message ?? ex.Message;

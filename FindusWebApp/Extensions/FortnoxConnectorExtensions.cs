@@ -35,7 +35,7 @@ namespace FindusWebApp.Extensions
             }
             return mergedCollection;
         }
-        public static async Task<IList<InvoiceAccrualSubset>> GetAccrualInvoices(this IInvoiceAccrualConnector connector, DateTime fromDate, DateTime toDate, int pageNr = 1, int maxPerPage = 20)
+        public static async Task<IList<InvoiceAccrualSubset>> GetAccrualInvoices(this IInvoiceAccrualConnector connector, DateTime fromDate, int pageNr = 1, int maxPerPage = 20)
         {
             var searchSettings = new InvoiceAccrualSearch
             {

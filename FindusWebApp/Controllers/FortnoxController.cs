@@ -86,13 +86,12 @@ namespace FindusWebApp.Controllers
         private void FetchAccrualInvoices(FortnoxContext context)
         {
             var fromDate = TempData["FromDate"] as string;
-            var toDate = TempData["ToDate"] as string;
+            //var toDate = TempData["ToDate"] as string;
             TempData["InvoiceAccrualSubset"] = context
                 .Client
                 .InvoiceAccrualConnector
                 .GetAccrualInvoices(
-                    DateTime.Parse(fromDate),
-                    DateTime.Parse(toDate))
+                    DateTime.Parse(fromDate))
                 .Result;
         }
 
