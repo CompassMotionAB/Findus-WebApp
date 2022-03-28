@@ -180,5 +180,14 @@ namespace FindusWebApp.Controllers
             }
             return new EmptyResult();
         }
+        public async Task<IActionResult> DeleteCustomerAsync(string customerNr) {
+            TempData["CustomerNr"] = customerNr;
+            await Call(DeleteCustomer);
+            return RedirectToAction("Fortnox");
+        }
+        private async void DeleteCustomer(FortnoxContext context) {
+            var customerNr = TempData["CustomerNr"] as string;
+            await context.Client.CustomerConnector.DeleteAsync(customerNr);
+        }
     }
 }
