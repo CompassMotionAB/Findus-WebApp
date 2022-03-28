@@ -31,10 +31,11 @@ namespace FindusWebApp.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        public async Task<IActionResult> IndexAsync()
+        public async Task<IActionResult> IndexAsync(string customerNr = null)
         {
             await Call(FetchCompanyName);
             // NOTE: Will redirect to "/Connect/Login" if Fornox is not authenticated:
+            TempData["CustomerNr"] = customerNr;
             return await CallRedirect(GetCustomersPage);
         }
         private async Task Call(Action<FortnoxContext> action)
@@ -82,31 +83,52 @@ namespace FindusWebApp.Controllers
             var customerNr = TempData["CustomerNr"] as string;
             TempData["InvoiceSubset"] = context.Client.InvoiceConnector.GetInvoices(customerNr).Result;
         }
+        private void FetchAccrualInvoices(FortnoxContext context)
+        {
+            var fromDate = TempData["FromDate"] as string;
+            var toDate = TempData["ToDate"] as string;
+            TempData["InvoiceAccrualSubset"] = context
+                .Client
+                .InvoiceAccrualConnector
+                .GetAccrualInvoices(
+                    DateTime.Parse(fromDate),
+                    DateTime.Parse(toDate))
+                .Result;
+        }
 
-        private async Task FetchAsync<TEntitySubset>(string customerNr)
+        private async Task FetchAsync<TEntitySubset>(string customerNr, string fromDate = null, string toDate = null)
         {
             string entityName = typeof(TEntitySubset)?.Name;
 
             TempData["CustomerNr"] = customerNr;
-            var cacheKey = customerNr ?? TempData.Peek("CacheKey") as string;
-            cacheKey += "-" + entityName;
+            var cacheKey = TempData.Peek("CacheKey") as string;
+            if (string.IsNullOrEmpty(cacheKey))
+            {
+                cacheKey = entityName + "_" + (customerNr ?? $"{fromDate}_{toDate}");
+            }
             if (!_memoryCache.TryGetValue(cacheKey, out object entities) || entities == null)
             {
-                var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromHours(8));
+                var cacheEntryOptions = new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromSeconds(5));
                 if (entityName == "InvoiceSubset")
                 {
                     await Call(FetchInvoices);
-                    _memoryCache.Set(cacheKey, TempData.Peek("InvoiceSubset"), cacheEntryOptions);
                 }
                 else if (entityName == "CustomerSubset")
                 {
                     await Call(FetchCustomers);
-                    _memoryCache.Set(cacheKey, TempData.Peek("CustomerSubset"), cacheEntryOptions);
+                }
+                else if (entityName == "InvoiceAccrualSubset")
+                {
+                    if (string.IsNullOrEmpty(fromDate) || string.IsNullOrEmpty(toDate)) throw new Exception("Missing to/from date for fetching Invoice Accruals");
+                    TempData["FromDate"] = fromDate;
+                    TempData["ToDate"] = toDate;
+                    await Call(FetchAccrualInvoices);
                 }
                 else
                 {
                     throw new ArgumentException("Unexpected type: " + entityName ?? nameof(TEntitySubset));
                 }
+                _memoryCache.Set(cacheKey, TempData.Peek(entityName), cacheEntryOptions);
                 return;
             }
             TempData[entityName] = entities;// as TEntitySubset[];
@@ -116,7 +138,7 @@ namespace FindusWebApp.Controllers
             TempData["CacheKey"] = "CustomerPage";
             var customerNr = TempData.Peek("CustomerNr") as string;
             await FetchAsync<CustomerSubset>(customerNr);
-            if(!string.IsNullOrEmpty(customerNr))
+            if (!string.IsNullOrEmpty(customerNr))
                 await FetchAsync<InvoiceSubset>(customerNr);
             TempData.Remove("CacheKey");
         }
@@ -130,6 +152,19 @@ namespace FindusWebApp.Controllers
             var client = context.Client;
             var conn = client.CompanyInformationConnector;
             ViewData["CompanyName"] = conn.GetAsync().Result.CompanyName;
+        }
+
+        public async Task<ActionResult> InvoiceAccruals(string dateFrom = null, string dateTo = null)
+        {
+            try
+            {
+                await FetchAsync<InvoiceAccrualSubset>(null, dateFrom, dateTo);
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            return View("InvoiceAccruals");
         }
 
         [HttpGet]

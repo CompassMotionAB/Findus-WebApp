@@ -21,24 +21,13 @@
         <br />
     }
 
-    <a asp-controller="Fortnox" asp-action="CreateCustomer">
-        <div>
-            <input type="submit" name="customerBtn" value="Create Customer" />
-        </div>
-    </a>
     <br />
 
     @if (ViewData["CustomerNr"] != null)
     {
         @Html.Raw(ViewData["CustomerInfo"])
         <br />
-
-        <a asp-controller="Fortnox" asp-action="CreateInvoice" asp-route-customerNr="@ViewData["CustomerNr"]">
-            <div>
-                <input type="submit" name="invoiceBtn" value="Create Invoice" />
-            </div>
-        </a>
-    }
+ }
     <br />
 
     @if (ViewData["InvoiceInfo"] != null)

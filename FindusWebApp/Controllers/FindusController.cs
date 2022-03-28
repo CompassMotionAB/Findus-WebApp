@@ -52,7 +52,6 @@ namespace FindusWebApp.Controllers
         private readonly AccountsModel _accounts;
         private readonly dynamic _coupons;
         private OrderViewModel _orderViewModel;
-
         private readonly IFortnoxServices _fortnox;
 
         public FindusController(IHttpClientFactory httpClientFactory, IMemoryCache memoryCache, IOptions<WooKeys> wcKeysOptions, IFortnoxServices fortnox)
@@ -60,7 +59,7 @@ namespace FindusWebApp.Controllers
             _httpClientFactory = httpClientFactory;
             _memoryCache = memoryCache;
             _cacheEntryOptions = new MemoryCacheEntryOptions()
-                                    .SetSlidingExpiration(TimeSpan.FromHours(8));
+                                    .SetSlidingExpiration(TimeSpan.FromMinutes(10));
             _fortnox = fortnox;
 
             _wcKeys = wcKeysOptions.Value;
@@ -241,7 +240,7 @@ namespace FindusWebApp.Controllers
             }
             catch (Exception ex)
             {
-                // TODO: 
+                // TODO:  
                 // Json Parse:
                 /* {
                     "code":"woocommerce_rest_shop_order_invalid_id",
@@ -261,31 +260,43 @@ namespace FindusWebApp.Controllers
             return orders;
         }
 
-        public async Task<IActionResult> Orders(string dateFrom = null, string dateTo = null)
+        public async Task<IActionResult> Orders(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
-            var orderRoute = new OrderRouteModel(null, dateFrom, dateTo);
+            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             if (!orderRoute.IsValid())
             {
                 return View("Orders");
             }
             var orders = await Get(orderRoute);
             var errors = new Dictionary<ulong?, string>();
+            var warnings = new Dictionary<ulong?, string>();
             ulong? lastFailedOrderId = null;
 
             var invoices = orders
                 .ToDictionary(o => o.id, o =>
-                {
-                    try
-                    {
-                        return GenInvoiceAccrual(o).Result;
-                    }
-                    catch (Exception ex)
-                    {
-                        errors.Add(o.id, ex.Message);
-                        lastFailedOrderId = o.id;
-                        return null;
-                    }
-                });
+                 {
+                     if (FortnoxHasOrder(o.id).Result)
+                     {
+                         warnings.Add(o.id, "Order already exists on Fortnox.");
+                         return null;
+                     }
+                     try
+                     {
+                         return GenInvoiceAccrual(o).Result;
+                     }
+                     catch (Exception ex)
+                     {
+                         errors.Add(o.id, ex.Message);
+                         lastFailedOrderId = o.id;
+                         return null;
+                     }
+                 });
+
+            if (invoices.Count == 0)
+            {
+                ViewBag.Message = "Unexpected Error Occurred, make sure you have a valid order id or date for order(s)";
+                return View("Findus");
+            }
 
             ViewBag.Message = errors.Count switch
             {
@@ -294,7 +305,7 @@ namespace FindusWebApp.Controllers
                 _ => ViewBag.Message = $"{errors.Count} st av {orders.Count} totalt Verifikat misslyckades."
             };
 
-            _orderViewModel = new OrderViewModel(orders, orderRoute, invoices, errors);
+            _orderViewModel = new OrderViewModel(orders, orderRoute, invoices, errors, warnings);
 
             if (errors.Count == 0)
             {
@@ -349,7 +360,7 @@ namespace FindusWebApp.Controllers
             TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate);
         }
 
-        public async Task<string> VerifyDates(ulong? orderId = null, string dateFrom = null, string dateTo = null)
+        public async Task<string> DEBUG_VerifyDates(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
             var orders = await Get(orderRoute);
@@ -372,7 +383,6 @@ namespace FindusWebApp.Controllers
 
         public async Task<ActionResult> Verification(ulong? orderId = null, string dateFrom = null, string dateTo = null, bool simplify = true)
         {
-            /* if (_wcOrderApi == null) { return RedirectToAction("Index"); } */
             if (orderId == null && (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo)))
             {
                 dateFrom = $"{DateTime.Now.AddDays(0):yyyy-MM-dd}";
@@ -385,23 +395,131 @@ namespace FindusWebApp.Controllers
         }
 
         [HttpGet]
-        public async Task TestAsync(ulong? orderId = null)
+        public async Task<IActionResult> SendToFortnox(ulong? orderId = null, string dateFrom = null, string dateTo = null)
         {
-            var order = await Get(orderId);
+            try
+            {
+                var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo);
+                var orders = await Get(orderRoute);
+                foreach (var order in orders)
+                {
+                    if (await FortnoxHasOrder(order.id))
+                    {
+                        ViewBag.Error = $"Order Id: {order.id} already exists in Fortnox.";
+                        return View("Findus");
+                        //return RedirectToAction("Orders", new { order.id, dateFrom, dateTo });
+                    }
 
-            TempData["LineItems"] = order.line_items;
-            await Call(UpdateArticles);
+                    decimal currencyRate = await GetCurrencyRate(order);
+                    VerificationModel verification = VerificationUtils.Verify(order, _accounts, currencyRate, coupons: _coupons);
+                    if (string.IsNullOrEmpty(verification.Error) && !await SendToFortnox(verification))
+                    {
+                        orderRoute.OrderId = order.id;
+                        ViewBag.Error ??= (verification.Error ?? "Failed to verify order.");
+                        var errors = new Dictionary<ulong?, string> { { order.id, ViewBag.Error } };
+                        return View("Orders", new OrderViewModel(orders, orderRoute, errors: errors));
+                    }
+                    else
+                    {
+                        //return await Orders(orderId, dateFrom, dateTo);
+                        ViewBag.Error ??= $"Failed to verify order id: {order.id}";
 
-            decimal accurateTotal = order.GetAccurateTotal();
-            decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
-            var invoice = VerificationUtils.GenInvoice(order, currencyRate);
-            TempData["Customer"] = invoice.GetCustomer(order);
-            await Call(UpdateCustomer);
-            if (TempData["CustomerNr"] is not string customerNr) throw new Exception("CustomerNr is not defined.");
-            invoice.CustomerNumber = customerNr;
-            TempData["Invoice"] = invoice;
-            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, coupons: _coupons, customerNr: customerNr);
-            await Call(CreateFortnoxInvoices);
+                        return View("Findus");
+                        //return RedirectToAction("Orders", new { order.id, dateFrom, dateTo });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            return View("Findus");
+        }
+
+        private async Task<bool> SendToFortnox(VerificationModel verification)
+        {
+            if (!verification.IsValid())
+            {
+                ViewBag.Error = verification.Error ?? ViewBag.Error;
+                return false;
+            }
+            try
+            {
+                string customerNr;
+                try
+                {
+                    var customer = verification.Customer;
+                    customerNr = await TryGetCustomerNr(customer.Email);
+
+                    customer.CustomerNumber = customerNr;
+                    TempData["Customer"] = customer;
+                    TempData["CustomerNr"] = customerNr;
+                    await Call(UpdateCustomer);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                    return false;
+                }
+                if (string.IsNullOrEmpty(customerNr))
+                {
+                    ViewBag.Error ??= $"Unexpected Error for customer: {verification.Customer.Email}, order id: {verification.OrderId}.";
+                    return false;
+                }
+                TempData["OrderItems"] = verification.OrderItems;
+                try
+                {
+                    await Call(UpdateArticles);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = $"Failed to add Order Items to Fortnox for order id: {verification.OrderId}.\n{ex.Message}\n${ex.InnerException?.Message}";
+                    return false;
+                }
+
+                verification.Invoice.CustomerNumber = customerNr;
+                TempData["Invoice"] = verification.Invoice;
+                TempData["InvoiceAccrual"] = verification.InvoiceAccrual;
+                try
+                {
+                    await Call(CreateFortnoxInvoices);
+                }
+                catch (Exception ex)
+                {
+                    ViewBag.Error = ex.Message;
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+                return false;
+            }
+            return true;
+        }
+
+        private async void DEBUGCreateFinancialYear(FortnoxContext context, int year = 2022)
+        {
+            var FromDate = new DateTime(year, 1, 1);
+            var ToDate = new DateTime(year + 1, 1, 1).AddTicks(-1);
+            try
+            {
+                var yearSubsetList = await context.Client.FinancialYearConnector.FindAsync(
+                    new FinancialYearSearch
+                    {
+                        Date = FromDate,
+                    });
+            }
+            catch (Exception ex)
+            {
+                await context.Client.FinancialYearConnector.CreateAsync(new FinancialYear
+                {
+                    FromDate = FromDate,
+                    ToDate = ToDate,
+                    AccountingMethod = AccountingMethod.Accrual,
+                    AccountChartType = $"BAS {year}"
+                });
+            }
         }
 
         private async Task Call(Action<FortnoxContext> action)
@@ -419,24 +537,28 @@ namespace FindusWebApp.Controllers
         private void TryGetCustomer(FortnoxContext context)
         {
             var customerEmail = TempData.Peek("CustomerEmail") as string;
-            var cacheKey = $"customer-{customerEmail}";
-            if (!_memoryCache.TryGetValue(cacheKey, out string customerNr))
+            try
             {
                 var customerCon = context.Client.CustomerConnector;
-                var customerSubsetList = customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, }).Result;
+                var customerSubsetList = await customerCon.FindAsync(new CustomerSearch() { Email = customerEmail, });
 
                 if (customerSubsetList?.Entities.Count == 1)
                 {
-                    customerNr = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
-                }
-                else
-                {
+                    TempData["CustomerNr"] = customerSubsetList.Entities.FirstOrDefault().CustomerNumber;
                     return;
                 }
-                _memoryCache.Set(cacheKey, customerNr, _cacheEntryOptions);
+                else if (customerSubsetList?.Entities.Count > 1)
+                {
+                    throw new Exception("Flera kunder med samma Email existerar i Fortnox.");
+                }
             }
-            TempData["CustomerNr"] = customerNr;
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            TempData["CustomerNr"] = null;
         }
+
         private async Task<string> TryGetCustomerNr(string customerEmail)
         {
             TempData["CustomerEmail"] = customerEmail;
@@ -444,29 +566,94 @@ namespace FindusWebApp.Controllers
             return TempData.Peek("CustomerNr") as string;
         }
 
+        [HttpGet]
+        public async Task<bool> FortnoxHasCustomer(string email)
+        {
+            if (string.IsNullOrEmpty(email)) return false;
+            TempData["CustomerEmail"] = email.ToLower();
+            await Call(TryGetCustomer);
+            return TempData["CustomerNr"] != null && !string.IsNullOrEmpty(TempData["CustomerNr"] as string);
+        }
+
+        [HttpGet]
+        public async Task<bool> FortnoxHasOrder(ulong? orderId = null)
+        {
+            if (orderId == null) return false;
+            TempData["OrderId"] = orderId;
+            await Call(TryGetOrder);
+            return TempData.Peek("HasOrder") != null && (bool)TempData["HasOrder"];
+        }
+        private async void TryGetOrder(FortnoxContext context)
+        {
+            if (TempData["OrderId"] is not ulong orderId) throw new Exception("OrderId is not defined.");
+            var hasOrder = false;
+            try
+            {
+                var orderCollection = await context.Client.InvoiceConnector.FindAsync(new InvoiceSearch
+                {
+                    YourOrderNumber = orderId.ToString()
+                });
+                hasOrder = orderCollection?.Entities.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+            }
+            TempData["HasOrder"] = hasOrder;
+        }
+
+
+        private async Task<string> UpdateCustomer(Customer customer)
+        {
+            TempData["Customer"] = customer;
+            await Call(UpdateCustomer);
+            return TempData["CustomerNr"] as string;
+        }
+
         private async void UpdateCustomer(FortnoxContext context)
         {
             if (TempData["Customer"] is not Customer customer) throw new Exception("Customer is not defined.");
-            var customerNr = await TryGetCustomerNr(customer.Email);
+            if (TempData["CustomerNr"] is not string customerNr) customerNr = await TryGetCustomerNr(customer.Email);
 
             var client = context.Client;
             var customerConn = client.CustomerConnector;
 
+            string error = "";
+
             if (customerNr != null)
             {
                 customer.CustomerNumber = customerNr;
-                await customerConn.UpdateAsync(customer);
+                try
+                {
+                    await customerConn.UpdateAsync(customer);
+                }
+                catch (Exception ex)
+                {
+                    error = $"{ex.Message} ${ex.InnerException?.Message}";
+                }
             }
             else
             {
-                customerNr = (await customerConn.CreateAsync(customer)).CustomerNumber;
+                try
+                {
+                    var newCustomer = await customerConn.CreateAsync(customer);
+                    customerNr = newCustomer.CustomerNumber;
+                }
+                catch (Exception ex)
+                {
+                    error = $"{ex.Message} ${ex.InnerException?.Message}";
+                }
+            }
+            if (customerNr == null)
+            {
+                throw new Exception($"Failed to create/update Customer: {customer.Email}\n{error}");
             }
             TempData["CustomerNr"] = customerNr;
         }
 
         private async void UpdateArticles(FortnoxContext context)
         {
-            if (TempData["LineItems"] is not List<OrderLineItem> items) throw new Exception("Invoice is not defined.");
+            if (TempData["OrderItems"] is not List<OrderLineItem> items) throw new Exception("OrderItems is not defined.");
             var articleCon = context.Client.ArticleConnector;
             foreach (var item in items)
             {
@@ -477,7 +664,7 @@ namespace FindusWebApp.Controllers
                     {
                         ArticleNumber = item.sku,
                         Type = ArticleType.Stock,
-                        Description = item.name
+                        Description = item.name.Replace('|', '-')
                     });
                 }
             }
@@ -489,15 +676,23 @@ namespace FindusWebApp.Controllers
             if (TempData["InvoiceAccrual"] is not InvoiceAccrual invoiceAccrual) throw new Exception("InvoiceAccrual is not defined.");
 
             var invoiceCon = context.Client.InvoiceConnector;
-            var invoiceAccCon = context.Client.InvoiceAccrualConnector;
+            try
+            {
+                if ((await invoiceCon.FindAsync(new InvoiceSearch { YourOrderNumber = invoice.YourOrderNumber }))?.Entities.Count != 0)
+                    throw new Exception($"Faktura för order id: {invoice.YourOrderNumber} finns redan i Fortnox");
 
-            if ((await invoiceCon.FindAsync(new InvoiceSearch { YourOrderNumber = invoice.YourOrderNumber }))?.Entities.Count != 0)
-                throw new Exception($"Faktura för order {invoice.YourOrderNumber} finns redan i Fortnox");
+                invoice = await invoiceCon.CreateAsync(invoice);
 
-            invoice = await invoiceCon.CreateAsync(invoice);
-
-            //invoiceAccrual.InvoiceNumber = invoice.DocumentNumber;
-            //await invoiceAccCon.CreateAsync(invoiceAccrual);
+                //var invoiceAccCon = context.Client.InvoiceAccrualConnector;
+                //invoiceAccrual.InvoiceNumber = invoice.DocumentNumber;
+                //await invoiceAccCon.CreateAsync(invoiceAccrual);
+            }
+            catch (Exception ex)
+            {
+                //throw new Exception($"Failed to search for invoice for Order Id:{invoice.YourOrderNumber}");
+                //ViewBag.Error = ex.InnerException?.Message ?? ex.Message;
+                throw;
+            }
         }
     }
 }

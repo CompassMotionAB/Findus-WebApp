@@ -48,7 +48,8 @@ namespace FindusWebApp.Models
         public string DateFrom => OrderRoute.DateFrom;
         public string DateTo => OrderRoute.DateTo;
         public Dictionary<ulong?, WcOrder> Orders;
-        public Dictionary<ulong?, string> Errors;
+        public Dictionary<ulong?, string> Errors { get; }
+        public Dictionary<ulong?, string> Warnings { get; }
         public IDictionary<string, string> OrderRouteData => new Dictionary<string, string> {
             {"orderId", CurrentId.ToString()},
             {"dateFrom", DateFrom},
@@ -64,11 +65,16 @@ namespace FindusWebApp.Models
 
         public OrderRouteModel OrderRoute { get; }
 
-        public OrderViewModel(IList<WcOrder> orders, OrderRouteModel orderRoute, Dictionary<ulong?, InvoiceAccrual> invoiceAccruals = null, Dictionary<ulong?, string> errors = null)
+        public OrderViewModel(
+            IList<WcOrder> orders,
+            OrderRouteModel orderRoute,
+            Dictionary<ulong?, InvoiceAccrual> invoiceAccruals = null,
+            Dictionary<ulong?, string> errors = null,
+            Dictionary<ulong?, string> warnings = null)
         {
             Orders = orders.ToDictionary(item => item.id);
             Errors = errors ?? new Dictionary<ulong?, string>();
-
+            Warnings = warnings ?? new Dictionary<ulong?, string>();
             OrderRoute = orderRoute;
             var orderId = orderRoute.OrderId;
 
@@ -95,18 +101,22 @@ namespace FindusWebApp.Models
             var match = InvoiceAccruals.FirstOrDefault(o => o.Key.ToString() == orderId);
             return match.Value != null;
         }
+        public string GetWarning(string orderId)
+        {
+            return Warnings?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+        }
         public string GetError(string orderId)
         {
-            return Errors.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return Errors?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
         public InvoiceAccrual GetInvoice(string orderId)
         {
-            return InvoiceAccruals.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return InvoiceAccruals?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
         public WcOrder GetOrder(string orderId = null)
         {
             if (string.IsNullOrEmpty(orderId)) return null;
-            return Orders.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
+            return Orders?.FirstOrDefault(o => o.Key.ToString() == orderId).Value;
         }
         public void SetCurrentId(ulong? id)
         {
