@@ -272,7 +272,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = "MONTHLY")
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null )
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -310,8 +310,7 @@ namespace Findus.Helpers
             {
                 CustomerNumber = customerNr,
                 InvoiceNumber = invoiceNr,
-                Period = period,
-
+                Period = "MONTHLY",
 
                 Order = order,
                 CountryIso = countryIso,
@@ -343,7 +342,9 @@ namespace Findus.Helpers
             return inv
                 //.TryAddCartTax(invAccrualData)
                 .TryVerifyRows()
-                .AddPaymentFee(invAccrualData);
+                .DEBUGAddMissing()
+                .AddPaymentFee(invAccrualData)
+                ;
             /*
             var inv = GenInvoiceAccrual(invAccrualData);
             try {
@@ -448,7 +449,10 @@ namespace Findus.Helpers
             IEnumerable<InvoiceAccrualRow> rows = new List<InvoiceAccrualRow>();
             foreach (var (id, invoice) in invoices)
             {
-                rows = rows.Concat(invoice.InvoiceAccrualRows);
+                if (invoice?.InvoiceAccrualRows != null)
+                {
+                    rows = rows.Concat(invoice.InvoiceAccrualRows);
+                }
             }
 
             return new InvoiceAccrual
@@ -521,6 +525,13 @@ namespace Findus.Helpers
             return invoice.GetCustomer(order);
         }
 
+        public static InvoiceAccrual DEBUGAddMissing(this InvoiceAccrual invoice) {
+            invoice.AccrualAccount = invoice.InvoiceAccrualRows[0].Account;
+            invoice.Total = invoice.InvoiceAccrualRows.GetTotalDebit();
+            invoice.RevenueAccount = 0001;
+            return invoice;
+        }
+
         private static InvoiceAccrual GenInvoiceAccrual(InvoiceAccrualData data)
         {
             var inv = new InvoiceAccrual()
@@ -528,9 +539,12 @@ namespace Findus.Helpers
                 Description = $"Faktura för order id: {data.Order.id}",
                 Period = data.Period,
                 InvoiceNumber = data.InvoiceNumber,
+
                 StartDate = data.Order.date_completed,
                 EndDate = data.Order.date_completed,
+
                 InvoiceAccrualRows = new List<InvoiceAccrualRow>()
+
             };
             if (data.IsInEu)
             {
@@ -628,7 +642,8 @@ namespace Findus.Helpers
 
         public static VerificationModel Verify(WcOrder order, AccountsModel accounts, decimal currencyRate, bool simplify = false, dynamic coupons = null)
         {
-            var result = new VerificationModel() {
+            var result = new VerificationModel()
+            {
                 OrderId = order.id,
                 OrderItems = order.line_items
             };

@@ -51,7 +51,7 @@
                 </td>
                 <td>@customer.Name</td>
                 <td>@customer.City</td>
-        @if(Invoices != null && Invoices.Count == 0) {
+        @if(Invoices == null || Invoices.Count == 0 || !Invoices.Any(i => i.CustomerNumber == @customer.CustomerNumber)) {
         <td>
             <a asp-controller="Fortnox" asp-action="DeleteCustomer" asp-route-customerNr="@customer.CustomerNumber">
                 <div>

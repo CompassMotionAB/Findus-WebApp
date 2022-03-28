@@ -18,6 +18,9 @@ namespace Findus.Models {
             {
                 Error = "Verification has expired.";
                 return false;
+            } else if(Customer == null) {
+                Error = "Verification is missing Customer.";
+                return false;
             }
             return String.IsNullOrEmpty(Error);
         }
