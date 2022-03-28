@@ -35,7 +35,7 @@ namespace FindusWebApp.Extensions
             }
             return mergedCollection;
         }
-        public static async Task<IList<InvoiceAccrualSubset>> GetAccrualInvoices(this IInvoiceAccrualConnector connector, DateTime fromDate, DateTime toDate, int pageNr = 1, int maxPerPage = 20)
+        public static async Task<IList<InvoiceAccrualSubset>> GetAccrualInvoices(this IInvoiceAccrualConnector connector, DateTime fromDate, int pageNr = 1, int maxPerPage = 20)
         {
             var searchSettings = new InvoiceAccrualSearch
             {
@@ -76,26 +76,5 @@ namespace FindusWebApp.Extensions
             }
             return mergedCollection;
         }
-
-        /*
-        private static async Task<List<TEntitySubset>> GetEntitiesForPagesAsync<TEntity,TEntitySubset, TConnector, TSearchSettings>(this EntityCollection<TEntitySubset> collection, TConnector connector, TSearchSettings searchSettings,int minPerPage, int maxPerPage)
-        where TEntitySubset : class
-        where TConnector : SearchableEntityConnector<TEntity, TEntitySubset, TSearchSettings>
-        where TSearchSettings : BaseSearch, new()
-        {
-            var totalSize = collection.TotalResources;
-            var neededPages = Utilities.GetNeededPages(minPerPage, maxPerPage, totalSize);
-
-            var mergedCollection = new List<CustomerSubset>();
-            for (var i = 0; i < neededPages; i++)
-            {
-                searchSettings.Limit = minPerPage;
-                searchSettings.Page = i + 1;
-                var smallCustomerCollection = await connector.FindAsync(searchSettings);
-                mergedCollection.AddRange(smallCustomerCollection.Entities);
-            }
-            return mergedCollection;
-        }
-        */
     }
 }

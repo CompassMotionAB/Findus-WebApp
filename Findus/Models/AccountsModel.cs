@@ -70,16 +70,6 @@ namespace Findus.Models
             }
             return accounts[payment_method];
         }
-
-        public AccountModel GetSalesAccount(string countryIso)
-        {
-            return Sales[countryIso];
-        }
-        public AccountModel GetVATAccount(string countryIso)
-        {
-            return VAT[countryIso];
-        }
-
         public RateModel GetSales(string countryIso, bool isStandard = false, bool isReduced = false) {
             if(isStandard && isReduced) throw new Exception("Account rate can only be either standard or reduced at once.");
             if(!Sales.ContainsKey(countryIso)) countryIso = "NON_EU";

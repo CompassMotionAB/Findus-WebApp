@@ -131,7 +131,7 @@ namespace FindusWebApp.Controllers
             return await CurrencyUtils.GetSEKCurrencyRateAsync(date, order.currency.ToUpper(), httpClient);
         }
 
-        private async Task<ActionResult> VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = true)
+        private ActionResult VerifyOrder(List<WcOrder> orders, OrderRouteModel orderRoute, bool simplify = true)
         {
             try
             {
@@ -300,7 +300,7 @@ namespace FindusWebApp.Controllers
 
             ViewBag.Message = errors.Count switch
             {
-                0 => ViewBag.Message ?? (orders.Count == 1) ? $"Beställningen är Verifierad" : $"Alla {orders.Count} Beställningar är Verifierade.",
+                0 => ViewBag.Message ?? (orders.Count == 1) ? "Beställningen är Verifierad" : $"Alla {orders.Count} Beställningar är Verifierade.",
                 1 => ViewBag.Message = $"Ett Verifikat misslyckades, Order Id: {GenOrderActionLinkHTML(lastFailedOrderId)}<br>{errors.First().Value}",
                 _ => ViewBag.Message = $"{errors.Count} st av {orders.Count} totalt Verifikat misslyckades."
             };
@@ -346,19 +346,6 @@ namespace FindusWebApp.Controllers
             return await Sum(orders);
         }
 
-        public async Task<ActionResult> Summation(string dateFrom = null, string dateTo = null, bool EUR = false)
-        {
-            if (string.IsNullOrEmpty(dateFrom) || string.IsNullOrEmpty(dateTo))
-            {
-                dateFrom = $"{DateTime.Now.AddDays(-1):yyyy-MM-dd}";
-                dateTo = $"{DateTime.Now:yyyy-MM-dd}";
-                return RedirectToAction("Summationa", new { dateFrom, dateTo });
-            }
-            var total = await Sum(dateFrom, dateTo, EUR);
-            ViewData["TotalSEK"] = $"{total:0.00}";
-            return View("Summation");
-        }
-
         private async Task<InvoiceAccrual> GenInvoiceAccrual(WcOrder order, bool simplify = true)
         {
             decimal accurateTotal = order.GetAccurateTotal();
@@ -370,7 +357,7 @@ namespace FindusWebApp.Controllers
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
             TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
-            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate, accurateTotal);
+            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate);
         }
 
         public async Task<string> DEBUG_VerifyDates(ulong? orderId = null, string dateFrom = null, string dateTo = null)
@@ -404,7 +391,7 @@ namespace FindusWebApp.Controllers
             var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo, "completed");
             var orders = await Get(orderRoute);
             //ViewData["TotalDebitForPeriod"] = $"{await Sum(orders):0.00}";
-            return await VerifyOrder(orders, orderRoute, simplify);
+            return VerifyOrder(orders, orderRoute, simplify);
         }
 
         [HttpGet]
@@ -458,18 +445,12 @@ namespace FindusWebApp.Controllers
             }
             try
             {
-                //TempData["Customer"] = verification.Customer;
                 string customerNr;
-                //await Call(UpdateCustomer);
                 try
                 {
-                    //await _fortnox.FortnoxApiCall(UpdateCustomer);
-                    //await Call(UpdateCustomer);
-                    //customerNr = await UpdateCustomer(verification.Customer);
-
                     var customer = verification.Customer;
                     customerNr = await TryGetCustomerNr(customer.Email);
-                    //if(string.IsNullOrEmpty(customerNr)) {
+
                     customer.CustomerNumber = customerNr;
                     TempData["Customer"] = customer;
                     TempData["CustomerNr"] = customerNr;
@@ -482,7 +463,6 @@ namespace FindusWebApp.Controllers
                 }
                 if (string.IsNullOrEmpty(customerNr))
                 {
-                    //throw new Exception($"Failed to update customer: {verification.Customer.Email} for order id: {verification.OrderId}.");
                     ViewBag.Error ??= $"Unexpected Error for customer: {verification.Customer.Email}, order id: {verification.OrderId}.";
                     return false;
                 }
@@ -517,29 +497,6 @@ namespace FindusWebApp.Controllers
             }
             return true;
         }
-        /*
-        private async Task<IActionResult> SendToFortnox(WcOrder order)
-        {
-            //await Call(DEBUGCreateFinancialYear);
-
-            decimal accurateTotal = order.GetAccurateTotal();
-            decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
-            var invoice = VerificationUtils.GenInvoice(order, currencyRate);
-            TempData["Customer"] = invoice.GetCustomer(order);
-            //await Call(UpdateCustomer);
-            await _fortnox.FortnoxApiCall(UpdateCustomer);
-            var customerNr = TempData["CustomerNr"] as string;
-            if (String.IsNullOrEmpty(customerNr)) throw new Exception($"Failed to update customer: {order.billing.email} for order id: {order.id}.");
-
-            TempData["LineItems"] = order.line_items;
-            await Call(UpdateArticles);
-
-            invoice.CustomerNumber = customerNr;
-            TempData["Invoice"] = invoice;
-            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, coupons: _coupons, customerNr: customerNr);
-            await Call(CreateFortnoxInvoices);
-            return View("Findus");
-        }*/
 
         private async void DEBUGCreateFinancialYear(FortnoxContext context, int year = 2022)
         {
@@ -553,7 +510,7 @@ namespace FindusWebApp.Controllers
                         Date = FromDate,
                     });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await context.Client.FinancialYearConnector.CreateAsync(new FinancialYear
                 {
@@ -730,7 +687,7 @@ namespace FindusWebApp.Controllers
                 //invoiceAccrual.InvoiceNumber = invoice.DocumentNumber;
                 //await invoiceAccCon.CreateAsync(invoiceAccrual);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //throw new Exception($"Failed to search for invoice for Order Id:{invoice.YourOrderNumber}");
                 //ViewBag.Error = ex.InnerException?.Message ?? ex.Message;
