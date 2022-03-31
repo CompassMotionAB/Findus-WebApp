@@ -10,87 +10,6 @@ using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
 {
-    public class InvoiceAccrualData
-    {
-        public WcOrder Order;
-
-        public IOrderedEnumerable<OrderLineItem> Items()
-        {
-            return Order.line_items.OrderByDescending(i => i.price);
-        }
-
-        public string GetTaxLabel(RateModel account, bool? isStandard = null)
-        {
-            return VerificationUtils.VerifyRate(account, Order, isStandard: isStandard ?? IsStandard);
-        }
-
-        public bool TotalStandardRateEquals(decimal value = 0.0M)
-        {
-            if (IsInEu)
-            {
-                return GetSalesAcc(IsStandard).Rate + GetVatAcc(IsStandard).Rate == value;
-            }
-            else
-            {
-                return GetSalesAcc(IsStandard, PaymentMethod).Rate + GetVatAcc(IsStandard, PaymentMethod).Rate == value;
-            }
-        }
-
-        public string CountryIso;
-        public AccountsModel Accounts { get; internal set; }
-        public AccountModel SalesAcc;
-        public AccountModel VatAcc;
-
-        /// <summary>
-        /// <returns>
-        /// Returns either Reduced or Standard Sales Account
-        /// Always returns the highest TAX Rate of the order, assuming that reduced VAT <= standard VAT.
-        /// If NO items in order has reduced rate, the order is considered Standard rate.
-        /// </returns>
-        /// </summary>
-        public RateModel GetSalesAcc(bool? isStandard = null, string paymentMethod = null, string countryIso = null)
-        {
-            isStandard ??= IsStandard;
-            if (!string.IsNullOrEmpty(paymentMethod)) return Accounts.GetSales(paymentMethod, isStandard: (bool)isStandard);
-            return Accounts.GetSales(countryIso, isStandard: (bool)isStandard);
-        }
-
-        /// <summary>
-        /// <returns>
-        /// Returns either Reduced or Standard VAT Account
-        /// Always returns the highest TAX Rate of the order, assuming that reduced VAT <= standard VAT.
-        /// If NO items in order has reduced rate, the order is considered Standard rate.
-        /// </returns>
-        /// </summary>
-        public RateModel GetVatAcc(bool? isStandard = null, string paymentMethod = null, string countryIso = null)
-        {
-            isStandard ??= IsStandard;
-            if (!string.IsNullOrEmpty(paymentMethod)) return Accounts.GetVAT(paymentMethod, isStandard: (bool)isStandard);
-            return Accounts.GetVAT(countryIso, isStandard: (bool)isStandard);
-        }
-
-        public bool HasShippingCost;
-        public bool IsStandard;
-        public bool IsReduced;
-        public bool HasDiscounts;
-
-        public decimal CurrencyRate;
-        public decimal Total;
-        public decimal ShippingSEK;
-        public decimal ShippingVatSEK;
-        public decimal ShippingTotalSEK => ShippingSEK + ShippingVatSEK;
-
-        public decimal CartTaxSEK { get; internal set; }
-        public decimal TotalItemsTaxSEK { get; internal set; }
-
-        public decimal TotalSEK;
-        public string PaymentMethod;
-        public bool IsInEu;
-        public string CustomerNumber;
-        public long? InvoiceNumber;
-        public string Period;
-    }
-
     public static class VerificationUtils
     {
         private static readonly List<string> EUCountries = new()
@@ -172,14 +91,15 @@ namespace Findus.Helpers
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
 
-        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, string customerNr = null)
+        public static Invoice GenInvoice(WcOrder order, decimal currencyRate, AccountsModel accounts, string customerNr = null)
         {
             if (order.date_paid == null) throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1) throw new Exception($"Order Id: {order.id} is missing items in order");
             if (!string.Equals(order.currency, "EUR", StringComparison.OrdinalIgnoreCase)) throw new Exception("Expected WooCommerce order to be in EUR");
 
             var invoiceRows = new List<InvoiceRow>();
-            // Assuming Product/Article exists in Fortnox
+
+            /*
             order.line_items.ForEach(i =>
                invoiceRows.Add(new InvoiceRow
                {
@@ -188,6 +108,9 @@ namespace Findus.Helpers
                    DeliveredQuantity = i.quantity,
                })
             );
+            */
+
+            var salesAccount = accounts.GetSalesAccount(order);
 
             return new Invoice()
             {
@@ -197,7 +120,7 @@ namespace Findus.Helpers
                 InvoiceDate = order.date_completed,
 
                 // PaymentWay = PaymentWay.Card,
-
+                VATIncluded = true,
                 Currency = "SEK",
                 CurrencyRate = 1, // TODO: Should this be 1, since we've already converted EUR->SEK?
                 YourOrderNumber = order.id.ToString(),
@@ -218,7 +141,12 @@ namespace Findus.Helpers
                 DeliveryCity = order.shipping.city,
 
                 InvoiceRows = invoiceRows,
-            };
+            }.GenInvoiceRows(new InvoiceData {
+                Accounts = accounts,
+                SalesAcc = salesAccount,
+                Order = order,
+                CountryIso = order.billing.country
+            });
         }
 
         private static bool VerifyCoupon(OrderCouponLine coupon, dynamic coupons)
@@ -272,7 +200,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null )
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null)
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -306,7 +234,7 @@ namespace Findus.Helpers
 
             var paymentMethod = GetPaymentMethod(order);
 
-            var invAccrualData = new InvoiceAccrualData
+            var invAccrualData = new InvoiceData
             {
                 CustomerNumber = customerNr,
                 InvoiceNumber = invoiceNr,
@@ -461,7 +389,7 @@ namespace Findus.Helpers
             };
         }
 
-        public static InvoiceAccrual TryAddCartTax(this InvoiceAccrual invoice, InvoiceAccrualData data)
+        public static InvoiceAccrual TryAddCartTax(this InvoiceAccrual invoice, InvoiceData data)
         {
             if (data.CartTaxSEK > 0.0M)
             {
@@ -475,7 +403,7 @@ namespace Findus.Helpers
             return invoice;
         }
 
-        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, InvoiceAccrualData data)
+        public static InvoiceAccrual AddPaymentFee(this InvoiceAccrual invoice, InvoiceData data)
         {
             return invoice.AddPaymentFee(data.Order, data.GetSalesAcc(isStandard: true, paymentMethod: data.PaymentMethod), data.PaymentMethod);
         }
@@ -525,14 +453,35 @@ namespace Findus.Helpers
             return invoice.GetCustomer(order);
         }
 
-        public static InvoiceAccrual DEBUGAddMissing(this InvoiceAccrual invoice) {
+        public static InvoiceAccrual DEBUGAddMissing(this InvoiceAccrual invoice)
+        {
             invoice.AccrualAccount = invoice.InvoiceAccrualRows[0].Account;
             invoice.Total = invoice.InvoiceAccrualRows.GetTotalDebit();
             invoice.RevenueAccount = 0001;
             return invoice;
         }
+        private static Invoice GenInvoiceRows(this Invoice invoice, InvoiceData data)
+        {
+            foreach (var item in data.Items())
+            {
+                // TODO: Verify that only flat discount (promo code) could attribute to 0 cost item
+                if (item.price == 0.0M && item.subtotal_tax == 0.0M) continue;
+                var isStandard = item.tax_class != "reduced-rate";
+                var salesAcc = data.GetSalesAcc(isStandard, countryIso: data.CountryIso);
+                var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
+                invoice.AddRow(
+                    salesAcc.AccountNr,
+                    item.sku,
+                    item.quantity ?? 1, // TODO: Is this safe to assume?
+                    price: item.GetTotalWithTax(),
+                    vat: salesAcc.Rate * 100M,
+                    info: $"Försäljning - {taxLabel}"
+                );
+            }
+            return invoice;
+        }
 
-        private static InvoiceAccrual GenInvoiceAccrual(InvoiceAccrualData data)
+        private static InvoiceAccrual GenInvoiceAccrual(InvoiceData data)
         {
             var inv = new InvoiceAccrual()
             {
@@ -544,7 +493,6 @@ namespace Findus.Helpers
                 EndDate = data.Order.date_completed,
 
                 InvoiceAccrualRows = new List<InvoiceAccrualRow>()
-
             };
             if (data.IsInEu)
             {
@@ -651,7 +599,7 @@ namespace Findus.Helpers
             {
                 var accurateTotal = order.GetAccurateTotal();
                 result.InvoiceAccrual = GenInvoiceAccrual(order, accounts, currencyRate, accurateTotal, simplify, coupons: coupons);
-                result.Invoice = GenInvoice(order, currencyRate);
+                result.Invoice = GenInvoice(order, currencyRate, accounts);
                 result.Customer = GetCustomer(result.Invoice, order);
             }
             catch (Exception ex)

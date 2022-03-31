@@ -203,7 +203,7 @@ namespace FindusWebApp.Controllers
         public async Task<Invoice> VerifyInvoice(WcOrder order, decimal? currencyRate = null)
         {
             currencyRate ??= await GetCurrencyRate(order);
-            return VerificationUtils.GenInvoice(order, (decimal)currencyRate);
+            return VerificationUtils.GenInvoice(order, (decimal)currencyRate, _accounts);
         }
 
         private async Task<bool> VerifyOrderBool(WcOrder order)
@@ -357,7 +357,7 @@ namespace FindusWebApp.Controllers
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
             TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
-            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate);
+            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate, _accounts);
         }
 
         public async Task<string> DEBUG_VerifyDates(ulong? orderId = null, string dateFrom = null, string dateTo = null)

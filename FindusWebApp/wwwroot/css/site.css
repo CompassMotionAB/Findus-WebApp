@@ -159,6 +159,7 @@ body {
 table {
   width: 100%;
   border: 2px solid var(--clr-element);
+  line-height: 1;
 }
 table a {
   color: var(--clr-link);
@@ -179,7 +180,7 @@ th {
 }
 
 td {
-  padding: 5px;
+  padding: 0px 5px;
   border: 1px solid;
 }
 
