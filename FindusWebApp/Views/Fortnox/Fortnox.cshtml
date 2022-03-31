@@ -14,7 +14,7 @@
         </div>
         <br />
     }
-    
+
     @if (ErrorMessage != null)
     {
         <div style="text-danger">@ErrorMessage</div>
@@ -27,7 +27,7 @@
     {
         @Html.Raw(ViewData["CustomerInfo"])
         <br />
- }
+    }
     <br />
 
     @if (ViewData["InvoiceInfo"] != null)
@@ -37,6 +37,6 @@
 
     @if (Customers != null)
     {
-        @Html.Partial("Partial/CustomerOverview", Customers)
+        <partial name="Partial/CustomerOverview" model="Customers" async />
     }
 </div>
