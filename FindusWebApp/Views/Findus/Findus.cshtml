@@ -27,7 +27,9 @@
     @if (@Model != null && Model.Orders?.Count != 1)
         {
 
-            <span>Totala Debet:en för Period: @Html.Raw(TotalDebit) Kr</span>
+            @if(@TotalDebit != null) {
+                <span>Totala Debet:en för Period: @Html.Raw(TotalDebit) Kr</span>
+            }
             @if (@OrderSelect != null)
             {
                 @Html.DropDownList("Orders", Model.OrderSelect, new { @class = "form-control center-block", @style="width: auto;",
