@@ -50,7 +50,6 @@ namespace FindusWebApp.Controllers
         private readonly IMemoryCache _memoryCache;
         private readonly MemoryCacheEntryOptions _cacheEntryOptions;
         private readonly AccountsModel _accounts;
-        private readonly dynamic _coupons;
         private OrderViewModel _orderViewModel;
         private readonly IFortnoxServices _fortnox;
 
@@ -77,7 +76,6 @@ namespace FindusWebApp.Controllers
                     JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
                     JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
                 );
-            _coupons = JsonUtilities.LoadJson<dynamic>("Coupons.json");
 
             ViewBag.CultureInfo = new System.Globalization.CultureInfo("sv-SE");
         }
@@ -350,13 +348,13 @@ namespace FindusWebApp.Controllers
         {
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
-            return VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
+            return VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify);
         }
         private async void GenInvoices(WcOrder order, bool simplify = true)
         {
             decimal accurateTotal = order.GetAccurateTotal();
             decimal currencyRate = await GetCurrencyRate(order, accurateTotal);
-            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify, coupons: _coupons);
+            TempData["InvoiceAccrual"] = VerificationUtils.GenInvoiceAccrual(order, _accounts, currencyRate, accurateTotal, simplify: simplify);
             TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate, _accounts);
         }
 
@@ -411,7 +409,7 @@ namespace FindusWebApp.Controllers
                     }
 
                     decimal currencyRate = await GetCurrencyRate(order);
-                    VerificationModel verification = VerificationUtils.Verify(order, _accounts, currencyRate, coupons: _coupons);
+                    VerificationModel verification = VerificationUtils.Verify(order, _accounts, currencyRate);
                     if (string.IsNullOrEmpty(verification.Error) && !await SendToFortnox(verification))
                     {
                         orderRoute.OrderId = order.id;

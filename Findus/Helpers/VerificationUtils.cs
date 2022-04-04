@@ -149,23 +149,6 @@ namespace Findus.Helpers
             });
         }
 
-        private static bool VerifyCoupon(OrderCouponLine coupon, dynamic coupons)
-        {
-            if ((coupon.discount != null && coupon.discount != 0.0M) || (coupon.discount_tax != null && coupon.discount_tax != 0.0M))
-            {
-                throw new Exception($"Unexpected discount amount: {coupon.discount} for discount code: {coupon.code}");
-            }
-
-            if (coupon.code == null)
-            {
-                throw new Exception("Order is missing discount code for applied discount");
-            }
-            dynamic code = (coupons["GB"] as IEnumerable<dynamic>).FirstOrDefault(i => i.Name == coupon.code);
-            if (code == null)
-                throw new Exception($"WooCommerce order contains unexpected coupon: {coupon.code}");
-            return code.Value?.discount ?? false;
-        }
-
         public static decimal GetAccurateCartTax(this WcOrder order)
         {
             decimal total = (decimal)order.line_items.Sum(i => i.GetAccurateTaxTotal());
@@ -200,7 +183,7 @@ namespace Findus.Helpers
 
         public static decimal GetTotalItemsTax(this WcOrder order) => order.line_items.Sum(i => i.GetAccurateTaxTotal());
 
-        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, dynamic coupons = null, string customerNr = null, long? invoiceNr = null, string period = null)
+        public static InvoiceAccrual GenInvoiceAccrual(WcOrder order, AccountsModel accounts, decimal currencyRate, decimal? accurateTotal = null, bool simplify = false, string customerNr = null, long? invoiceNr = null, string period = null)
         {
             var vatAccount = accounts.GetVATAccount(order);
             var salesAccount = accounts.GetSalesAccount(order);
@@ -214,11 +197,6 @@ namespace Findus.Helpers
 
             if (order.fee_lines != null && order.fee_lines.Count != 0)
                 throw new Exception("WooCommerce order contains unexpected 'fee_lines'");
-
-            bool hasDiscounts = order.coupon_lines.Any(coupon => VerifyCoupon(coupon, coupons));
-
-            if (!hasDiscounts && order.discount_total != null && order.discount_total != 0.0M)
-                throw new Exception("WooCommerce order contains unexpected 'discount_total'");
 
             decimal total = accurateTotal ?? order.GetAccurateTotal();
 
@@ -588,7 +566,7 @@ namespace Findus.Helpers
             return inv;
         }
 
-        public static VerificationModel Verify(WcOrder order, AccountsModel accounts, decimal currencyRate, bool simplify = false, dynamic coupons = null)
+        public static VerificationModel Verify(WcOrder order, AccountsModel accounts, decimal currencyRate, bool simplify = false)
         {
             var result = new VerificationModel()
             {
@@ -598,7 +576,7 @@ namespace Findus.Helpers
             try
             {
                 var accurateTotal = order.GetAccurateTotal();
-                result.InvoiceAccrual = GenInvoiceAccrual(order, accounts, currencyRate, accurateTotal, simplify, coupons: coupons);
+                result.InvoiceAccrual = GenInvoiceAccrual(order, accounts, currencyRate, accurateTotal, simplify);
                 result.Invoice = GenInvoice(order, currencyRate, accounts);
                 result.Customer = GetCustomer(result.Invoice, order);
             }
