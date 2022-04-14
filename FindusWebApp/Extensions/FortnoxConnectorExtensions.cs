@@ -51,7 +51,7 @@ namespace FindusWebApp.Extensions
             if(collection == null) throw new Exception("Unexpected return result from Invoice Accrual FindAsync()");
             return collection.Entities;
         }
-        public static async Task<List<CustomerSubset>> GetCustomers(this ICustomerConnector connector, string customerNr = null, int minPerPage = 5, int maxPerPage = 20)
+        public static async Task<List<CustomerSubset>> GetCustomers(this ICustomerConnector connector, string customerNr = null, int minPerPage = 5, int maxPerPage = 40)
         {
             var searchSettings = new CustomerSearch
             {

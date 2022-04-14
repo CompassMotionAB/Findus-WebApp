@@ -14,7 +14,7 @@ namespace Findus.Models {
 
         public bool IsValid()
         {
-            if ((DateTime.Now - TimeStamp).TotalMinutes >= 10 || DateTime.Now < TimeStamp)
+            if ((DateTime.Now - TimeStamp).TotalMinutes >= 20 || DateTime.Now < TimeStamp)
             {
                 Error = "Verification has expired.";
                 return false;
@@ -34,6 +34,6 @@ namespace Findus.Models {
         public List<OrderLineItem> OrderItems;
         public string Error;
 
-        public ulong? OrderId;
+        public string OrderId;
     }
 }

@@ -87,7 +87,6 @@ namespace FindusWebApp.Services.Fortnox
                     catch (Exception)
                     {
                         // TODO: For now, assumes faulty token and removes it
-                        //throw new Exception(message: ex.Message);
                         _tokens.Token.RemoveRange(_tokens.Token);
                         await _tokens.SaveChangesAsync();
                     }

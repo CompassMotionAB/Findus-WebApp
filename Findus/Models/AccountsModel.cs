@@ -44,8 +44,9 @@ namespace Findus.Models
         public AccountModel GetVATAccount(WcOrder order)
         {
             var countryIso = order.billing.country;
+            var paymentMethod = VerificationUtils.GetPaymentMethod(order);
 
-            return GetAccount(VAT, countryIso);
+            return GetAccount(VAT, countryIso, paymentMethod);
         }
         public AccountModel GetSalesAccount(WcOrder order)
         {
@@ -54,19 +55,14 @@ namespace Findus.Models
 
             return GetAccount(Sales, countryIso, paymentMethod);
         }
-        private static AccountModel GetAccount(Dictionary<string, AccountModel> accounts, string countryIso, string payment_method = null!)
+        private static AccountModel GetAccount(Dictionary<string, AccountModel> accounts, string countryIso, string payment_method)
         {
             if (accounts.ContainsKey(countryIso))
             {
                 return accounts[countryIso];
-            }
-            if (/* string.IsNullOrEmpty(payment_method) &&  */accounts.ContainsKey("NON_EU"))
+            } else if (string.IsNullOrEmpty(payment_method))
             {
-                return accounts["NON_EU"];
-            }
-            if (string.IsNullOrEmpty(payment_method))
-            {
-                throw new ArgumentException("Payment Method required for countries outside EU: Expected Stripe or PayPal");
+                throw new ArgumentException("Payment Method required for countries outside EU: Expected Stripe or PayPal. Maybe this order should be processed manually?");
             }
             return accounts[payment_method];
         }
