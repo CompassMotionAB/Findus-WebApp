@@ -35,5 +35,7 @@ namespace Findus.Models {
         public string Error;
 
         public string OrderId;
+
+        public string PdfLink { get; set; }
     }
 }

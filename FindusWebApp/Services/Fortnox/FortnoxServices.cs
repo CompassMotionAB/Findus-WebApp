@@ -11,6 +11,7 @@ using FindusWebApp.Helpers;
 using FindusWebApp.Extensions;
 using System.Collections.Generic;
 using Fortnox.SDK.Entities;
+using Findus.Helpers;
 
 namespace FindusWebApp.Services.Fortnox
 {
@@ -49,6 +50,7 @@ namespace FindusWebApp.Services.Fortnox
     {
         private readonly TokensContext _tokens;
         private readonly OAuth2Keys _auth2keys;
+        private readonly RateLimitHelper _rateLimiter = new(240, new TimeSpan(0, 1, 0));
 
         public FortnoxServices(TokensContext tokens, IOptions<OAuth2Keys> auth2Keys)
         {
@@ -71,6 +73,7 @@ namespace FindusWebApp.Services.Fortnox
             try
             {
                 var context = new FortnoxContext(token);
+                _rateLimiter.SleepAsNeeded();
                 apiCallFunction(context);
                 _tokens.SaveChanges();
             }

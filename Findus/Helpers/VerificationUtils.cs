@@ -155,30 +155,22 @@ namespace Findus.Helpers
                 InvoiceDate = order.date_paid,
                 PaymentWay = PaymentWay.Card,
                 VATIncluded = true,
-                Currency = "SEK",
-                CurrencyRate = 1,
+                Currency = "EUR",
+                CurrencyRate = currencyRate,
+
+                // Currency = "SEK",
+                // CurrencyRate = 1,
+
                 YourOrderNumber = order.id.ToString(),
                 //YourReference = order.customer_id?.ToString(), //TODO: Should this be used?
 
                 CustomerName = $"{order.billing.first_name} {order.billing.last_name}".Trim(),
-                Country = String.Equals(
-                    order.billing.country,
-                    "SE",
-                    StringComparison.OrdinalIgnoreCase
-                )
-                  ? "Sweden "
-                  : CountryUtils.GetEnglishName(order.billing.country),
+                Country = CountryUtils.GetEnglishName(order.billing.country),
                 Address1 = order.billing.address_1,
                 Address2 = order.billing.address_2,
                 ZipCode = order.billing.postcode,
                 City = order.billing.city,
-                DeliveryCountry = String.Equals(
-                    order.billing.country,
-                    "SE",
-                    StringComparison.OrdinalIgnoreCase
-                )
-                  ? "Sweden "
-                  : CountryUtils.GetEnglishName(order.billing.country),
+                DeliveryCountry = CountryUtils.GetEnglishName(order.shipping.country),
                 DeliveryAddress1 = order.shipping.address_1,
                 DeliveryAddress2 = order.shipping.address_2,
                 DeliveryZipCode = order.shipping.postcode,
@@ -512,12 +504,10 @@ namespace Findus.Helpers
                 Type = CustomerType.Private,
                 Email = order.billing.email,
                 CountryCode = order.shipping.country.ToUpper(),
-
                 Address1 = invoice.Address1,
                 Address2 = invoice.Address2,
                 City = invoice.City,
-
-                //Ref = order.customer_id != 0 ? order.customer_id.ToString() : null,
+                //YourReference = order.customer_id != 0 ? order.customer_id.ToString() : null,
                 DeliveryName = invoice.DeliveryName,
                 DeliveryAddress1 = invoice.DeliveryAddress1,
                 DeliveryAddress2 = invoice.DeliveryAddress2,
@@ -543,14 +533,15 @@ namespace Findus.Helpers
                     continue;
                 var isStandard = item.tax_class != "reduced-rate";
                 var salesAcc = data.GetSalesAcc(isStandard, countryIso: data.CountryIso);
-                var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
+                //var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
                 invoice.AddRow(
                     salesAcc.AccountNr,
                     item.sku,
                     item.quantity ?? 1, // TODO: Is this safe to assume?
                     price: item.GetTotalWithTax(),
                     vat: salesAcc.Rate * 100M,
-                    info: $"Försäljning - {taxLabel}"
+                    info: $"{item.name}"
+                //info: $"Försäljning - {taxLabel}"
                 );
             }
             return invoice;
@@ -665,8 +656,9 @@ namespace Findus.Helpers
             var result = new VerificationModel()
             {
                 OrderId = order.id.ToString(),
-                OrderItems = order.line_items
+                OrderItems = order.line_items,
             };
+           
             try
             {
                 var accurateTotal = order.GetAccurateTotal();
@@ -678,7 +670,7 @@ namespace Findus.Helpers
                     simplify
                 );
                 result.Invoice = GenInvoice(order, currencyRate, accounts);
-                result.Customer = GetCustomer(result.Invoice, order);
+                result.Customer = GetCustomer(result.Invoice, order).AddVatType(order.billing.country);
             }
             catch (Exception ex)
             {

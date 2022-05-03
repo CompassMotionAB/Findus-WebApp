@@ -9,11 +9,16 @@ namespace Findus.Helpers
         {
             try
             {
-                return new RegionInfo(countryCode).EnglishName;
+                return countryCode.ToUpper() switch
+                {
+                    "SE" => "Sverige",
+                    "CZ" => "Czech Republic",
+                    _ => new RegionInfo(countryCode).EnglishName
+                };
             }
             catch (Exception)
             {
-                return $"Missing English Name: {countryCode}";
+                return $"Missing English Name for {countryCode}";
             }
         }
     }

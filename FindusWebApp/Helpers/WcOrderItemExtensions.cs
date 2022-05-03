@@ -98,8 +98,6 @@ namespace FindusWebApp.Helpers
                 var dateAfterOffset = dateAfter;
                 dateAfterOffset.AddDays(-12);
                 orders = new List<WcOrder>(itemsPerPage);
-                if (orders.Count >= itemsPerPage)
-                    throw new Exception("Assertion failed");
                 orders = await wcOrderApi.GetPage(
                     dateAfterOffset,
                     dateBefore,
