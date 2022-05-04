@@ -21,7 +21,7 @@ namespace Findus.Helpers
             _replacements["^"] = " ";
         }
 
-        public static string SanitizeDescriptionForFortnoxArticle(this string description)
+        public static string SanitizeStringForFortnox(this string description)
         {
             foreach (string to_replace in _replacements.Keys)
             {

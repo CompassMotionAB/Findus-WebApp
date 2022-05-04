@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Findus.Models;
 using Fortnox.SDK.Entities;
+using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
 {
@@ -8,9 +10,19 @@ namespace Findus.Helpers
         public decimal Amount;
         public DiscountType Type;
     }
+
     public static class InvoiceExtensions
     {
-        public static void AddRow(this Invoice invoice, int accountNr, string sku, decimal quantity, decimal price, decimal vat, Discount discount = default, string info = null)
+        public static void AddRow(
+            this Invoice invoice,
+            int accountNr,
+            string sku,
+            decimal quantity,
+            decimal price,
+            decimal vat,
+            Discount discount = default,
+            string info = null
+        )
         {
             var newRow = new InvoiceRow
             {
@@ -28,6 +40,36 @@ namespace Findus.Helpers
             }
 
             invoice.InvoiceRows.Add(newRow);
+        }
+
+        public static Invoice SetInvoiceRows(
+            this Invoice invoice,
+            WcOrder order,
+            AccountsModel accounts,
+            bool refund = false
+        )
+        {
+            var rows = new List<InvoiceRow>();
+            foreach (var item in order.line_items)
+            {
+                var account = refund
+                    ? accounts.GetPurchaseAccount(order, item)
+                    : accounts.GetSalesAccount(order, item);
+                rows.Add(
+                    new InvoiceRow
+                    {
+                        AccountNumber = account.AccountNr,
+                        DeliveredQuantity = item.quantity,
+                        Price = item.price,
+                        Discount = 0,
+                        ArticleNumber = item.sku,
+                        Description = item.SanitizeNameForFortnox()
+                    }
+                );
+            }
+
+            invoice.InvoiceRows = rows;
+            return invoice;
         }
     }
 }

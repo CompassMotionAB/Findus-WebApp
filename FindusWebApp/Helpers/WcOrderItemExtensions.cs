@@ -163,7 +163,8 @@ namespace FindusWebApp.Helpers
             // Try to get order from cache
             var order = TryGetCachedOrder(orderRoute.OrderId, memoryCache);
 
-            return order ?? await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status, memoryCache);
+            return order
+                ?? await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status, memoryCache);
         }
 
         public static async Task<WcOrder> GetOrder(
@@ -177,13 +178,15 @@ namespace FindusWebApp.Helpers
             {
                 throw new ArgumentNullException(paramName: nameof(orderId));
             }
-            if(memoryCache != null) {
-                if(memoryCache.TryGetValue(orderId, out WcOrder cachedOrder)) {
+            if (memoryCache != null)
+            {
+                if (memoryCache.TryGetValue(orderId, out WcOrder cachedOrder))
+                {
                     return cachedOrder;
                 }
             }
             var order = await wcOrderApi.Get(
-                (int)Convert.ToUInt64(orderId),
+                Convert.ToInt32(orderId),
                 new Dictionary<string, string> { { "status", orderStatus } }
             );
             if (order?.status != orderStatus)
@@ -209,6 +212,24 @@ namespace FindusWebApp.Helpers
             }
             memoryCache?.Set(orderId, order, _orderCacheOptions);
             return order;
+        }
+
+        public static async Task AddInvoiceReferenceAsync(
+            this WCObject.WCOrderItem wcOrderApi,
+            string orderId,
+            long? invoiceNumber
+        )
+        {
+            await wcOrderApi.Update(
+                Convert.ToInt32(orderId),
+                new WcOrder
+                {
+                    meta_data = new List<OrderMeta>
+                    {
+                        new OrderMeta { key = "_fortnox_invoice_number", value = invoiceNumber, }
+                    }
+                }
+            );
         }
     }
 }

@@ -157,34 +157,75 @@ namespace Findus.Helpers
                 VATIncluded = true,
                 Currency = "EUR",
                 CurrencyRate = currencyRate,
-
                 // Currency = "SEK",
                 // CurrencyRate = 1,
 
                 YourOrderNumber = order.id.ToString(),
                 //YourReference = order.customer_id?.ToString(), //TODO: Should this be used?
 
-                CustomerName = $"{order.billing.first_name} {order.billing.last_name}".Trim(),
-                Country = CountryUtils.GetEnglishName(order.billing.country),
-                Address1 = order.billing.address_1,
-                Address2 = order.billing.address_2,
-                ZipCode = order.billing.postcode,
-                City = order.billing.city,
-                DeliveryCountry = CountryUtils.GetEnglishName(order.shipping.country),
-                DeliveryAddress1 = order.shipping.address_1,
-                DeliveryAddress2 = order.shipping.address_2,
-                DeliveryZipCode = order.shipping.postcode,
-                DeliveryCity = order.shipping.city,
+                ExternalInvoiceReference1 = order.id?.ToString(),
                 InvoiceRows = invoiceRows,
-            }.GenInvoiceRows(
-                new InvoiceData
-                {
-                    Accounts = accounts,
-                    SalesAcc = salesAccount,
-                    Order = order,
-                    CountryIso = order.billing.country
-                }
-            );
+            }
+                .AddCustomerData(order)
+                .GenInvoiceRows(
+                    new InvoiceData
+                    {
+                        Accounts = accounts,
+                        SalesAcc = salesAccount,
+                        Order = order,
+                        CountryIso = order.billing.country
+                    }
+                );
+        }
+
+        public static Invoice AddCustomerData(this Invoice invoice, WcOrder order)
+        {
+            invoice.CustomerName = $"{order.billing.first_name} {order.billing.last_name}".Trim();
+            invoice.Country = CountryUtils.GetEnglishName(order.billing.country);
+            invoice.Address1 = order.billing.address_1;
+            invoice.Address2 = order.billing.address_2;
+            invoice.ZipCode = order.billing.postcode;
+            invoice.City = order.billing.city;
+            invoice.DeliveryCountry = CountryUtils.GetEnglishName(order.shipping.country);
+            invoice.DeliveryAddress1 = order.shipping.address_1;
+            invoice.DeliveryAddress2 = order.shipping.address_2;
+            invoice.DeliveryZipCode = order.shipping.postcode;
+            invoice.DeliveryCity = order.shipping.city;
+            return invoice;
+        }
+
+        // NOTE: Only used in testing
+        public static Invoice TryCreateRefundInvoice(
+            WcOrder order,
+            decimal currencyRate,
+            AccountsModel accounts,
+            string customerNr = null
+        )
+        {
+            return new Invoice
+            {
+                // InvoiceType = null
+                InvoiceDate = DateTime.Now,
+                PaymentWay = PaymentWay.Card,
+                VATIncluded = true,
+                Currency = "EUR",
+                CurrencyRate = currencyRate,
+                CustomerNumber = customerNr,
+                YourOrderNumber = order.id.ToString(),
+                InvoiceRows = order.line_items.ConvertAll(
+                    item =>
+                    {
+                        var acc = accounts.GetPurchaseAccount(order, item);
+                        return new InvoiceRow
+                        {
+                            AccountNumber = acc.AccountNr,
+                            Price = item.GetTotalWithTax(),
+                            ArticleNumber = item.sku,
+                            DeliveredQuantity = item.quantity,
+                        };
+                    }
+                ),
+            }.AddCustomerData(order);
         }
 
         public static decimal GetAccurateCartTax(this WcOrder order)
@@ -237,8 +278,7 @@ namespace Findus.Helpers
             decimal? accurateTotal = null,
             bool simplify = false,
             string customerNr = null,
-            long? invoiceNr = null,
-            string period = null
+            long? invoiceNr = null
         )
         {
             var vatAccount = accounts.GetVATAccount(order);
@@ -658,7 +698,7 @@ namespace Findus.Helpers
                 OrderId = order.id.ToString(),
                 OrderItems = order.line_items,
             };
-           
+
             try
             {
                 var accurateTotal = order.GetAccurateTotal();
@@ -670,7 +710,8 @@ namespace Findus.Helpers
                     simplify
                 );
                 result.Invoice = GenInvoice(order, currencyRate, accounts);
-                result.Customer = GetCustomer(result.Invoice, order).AddVatType(order.billing.country);
+                result.Customer = GetCustomer(result.Invoice, order)
+                    .AddVatType(order.billing.country);
             }
             catch (Exception ex)
             {

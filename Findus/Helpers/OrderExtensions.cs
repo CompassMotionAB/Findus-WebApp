@@ -1,4 +1,3 @@
-using WooCommerceNET.WooCommerce.v2;
 using Order = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
@@ -31,6 +30,10 @@ namespace Findus.Helpers
             }
 
             return pdfLink;
+        }
+
+        public static string GetInvoiceReference(this Order order) {
+            return order.meta_data.Find(m => m.key == "_fortnox_invoice_number")?.value as string;
         }
     }
 }
