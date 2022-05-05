@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="Coupons.json"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Update="web.config"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
     <None Include="wwwroot\images\C2FNK_white_btn_lg_default.png" />
     <None Update="SalesAccounts.json"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
@@ -17,10 +16,11 @@
   </ItemGroup>
      <ItemGroup>
       <None Include="wwwroot/**" Link="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="Always" />
-    </ItemGroup> 
+    </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Fortnox.NET.SDK" Version="4.3.0" />
+    <PackageReference Include="MailKit" Version="3.2.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -29,9 +29,9 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
-  
+
   <ItemGroup>
     <ProjectReference Include="..\Findus\Findus.csproj" />
   </ItemGroup>
-  
+
 </Project>

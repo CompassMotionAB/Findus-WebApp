@@ -9,7 +9,7 @@
     //Layout = null;
 }
 
-<h2>Kundfaktura</h2>
+<h2>Faktura</h2>
 @* <table>
     <h3>Kund</h3>
     <tr>
@@ -50,6 +50,5 @@
  </p>
 @if (@Model.InvoiceRows != null)
 {
-    <h3>Produkter</h3>
-    @Html.Partial("Partial/InvoiceRows", @Model.InvoiceRows)
+    <partial name="Partial/InvoiceRows" model="@Model.InvoiceRows" async />
 }

@@ -1,10 +1,10 @@
 namespace Findus.Models {
     public class OrderRouteModel {
-        public ulong? OrderId;
+        public string OrderId;
         public string DateFrom = null;
         public string DateTo = null;
         public string Status = null;
-        public OrderRouteModel(ulong? orderId, string dateFrom = null, string dateTo = null, string status = "completed")
+        public OrderRouteModel(string orderId, string dateFrom = null, string dateTo = null, string status = "completed")
         {
             OrderId = orderId;
             DateFrom = dateFrom;

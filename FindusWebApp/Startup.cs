@@ -31,26 +31,32 @@ namespace FindusWebApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.Configure<CookiePolicyOptions>(options =>
-            {
-                // This lambda determines whether user consent for non-essential cookies is needed for a given request.
-                options.CheckConsentNeeded = _ => true;
-                options.MinimumSameSitePolicy = SameSiteMode.None;
-            });
+            services.Configure<CookiePolicyOptions>(
+                options =>
+                {
+                    // This lambda determines whether user consent for non-essential cookies is needed for a given request.
+                    options.CheckConsentNeeded = _ => true;
+                    options.MinimumSameSitePolicy = SameSiteMode.None;
+                }
+            );
 
             IdentityModelEventSource.ShowPII = true;
 
             // <!--- Session
             services.AddDistributedMemoryCache();
 
-            services.AddSession(options =>
-            {
-                // Set a short timeout for easy testing.
-                if (Environment.IsDevelopment()) options.IdleTimeout = TimeSpan.FromSeconds(10);
-                else options.IdleTimeout = TimeSpan.FromMinutes(30);
-                options.Cookie.HttpOnly = true;
-                options.Cookie.IsEssential = true;
-            });
+            services.AddSession(
+                options =>
+                {
+                    // Set a short timeout for easy testing.
+                    if (Environment.IsDevelopment())
+                        options.IdleTimeout = TimeSpan.FromSeconds(240);
+                    else
+                        options.IdleTimeout = TimeSpan.FromMinutes(30);
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.IsEssential = true;
+                }
+            );
             // ---!>
 
             services.Configure<FortnoxSettings>(Configuration.GetSection(FortnoxSettings.Name));
@@ -65,7 +71,9 @@ namespace FindusWebApp
 
             services.AddFortnoxAuthorization(Configuration);
 
-            services.AddDbContext<TokensContext>(options => options.UseSqlite("name=ConnectionStrings:DBConnectionString"));
+            services.AddDbContext<TokensContext>(
+                options => options.UseSqlite("name=ConnectionStrings:DBConnectionString")
+            );
 
             services.AddTransient<IFortnoxServices, FortnoxServices>();
 
@@ -98,12 +106,15 @@ namespace FindusWebApp
 
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllerRoute(
-                    name: "default",
-                    pattern: "{controller=Home}/{action=Index}/{id?}");
-            });
+            app.UseEndpoints(
+                endpoints =>
+                {
+                    endpoints.MapControllerRoute(
+                        name: "default",
+                        pattern: "{controller=Home}/{action=Index}/{id?}"
+                    );
+                }
+            );
         }
     }
 }

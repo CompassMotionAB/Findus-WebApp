@@ -15,10 +15,18 @@ namespace FindusWebApp.Helpers
 {
     public static class WcOrderItemExtensions
     {
-        private static readonly MemoryCacheEntryOptions _orderCacheOptions = new MemoryCacheEntryOptions()
-                                    .SetSlidingExpiration(TimeSpan.FromMinutes(30));
+        private static readonly MemoryCacheEntryOptions _orderCacheOptions =
+            new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromMinutes(30));
 
-        private static async Task<List<WcOrder>> GetPage(this WCObject.WCOrderItem wcOrderApi, DateTime? dateAfter = null, DateTime? dateBefore = null, int pageNumber = 1, int itemPerPage = 100, string dateStr = null, string orderStatus = "completed")
+        private static async Task<List<WcOrder>> GetPage(
+            this WCObject.WCOrderItem wcOrderApi,
+            DateTime? dateAfter = null,
+            DateTime? dateBefore = null,
+            int pageNumber = 1,
+            int itemPerPage = 100,
+            string dateStr = null,
+            string orderStatus = "completed"
+        )
         {
             if (dateAfter == null && dateBefore == null)
             {
@@ -34,21 +42,34 @@ namespace FindusWebApp.Helpers
                 dateAfter ??= dateBefore;
                 dateBefore ??= dateAfter;
             }
-            var orders = await wcOrderApi.GetAll(new Dictionary<string, string>() {
-                    {"page", pageNumber.ToString()},
-                    {"per_page", itemPerPage.ToString()},
-                    {"after", dateAfter.ToWcDate()},
-                    {"before", dateBefore.ToWcDate()},
-                    {"status", orderStatus}
-                });
+            var orders = await wcOrderApi.GetAll(
+                new Dictionary<string, string>()
+                {
+                    { "page", pageNumber.ToString() },
+                    { "per_page", itemPerPage.ToString() },
+                    { "after", dateAfter.ToWcDate() },
+                    { "before", dateBefore.ToWcDate() },
+                    { "status", orderStatus }
+                }
+            );
             // NOTE: Temporary fix to remove unexpected orders outside date range
             //orders.RemoveAll(i => i.date_paid > dateBefore || i.date_paid < dateAfter);
-            if (orders.Count == 0) throw new Exception("No Orders returned from WooCommerce");
+            if (orders.Count == 0)
+                throw new Exception("No Orders returned from WooCommerce");
             return orders;
         }
-        public static async Task<List<WcOrder>> GetOrders(this WCObject.WCOrderItem wcOrderApi, string dateFrom = null, string dateTo = null, IMemoryCache memoryCache = null, int pageNumber = 1, string orderStatus = "completed")
+
+        public static async Task<List<WcOrder>> GetOrders(
+            this WCObject.WCOrderItem wcOrderApi,
+            string dateFrom = null,
+            string dateTo = null,
+            IMemoryCache memoryCache = null,
+            int pageNumber = 1,
+            string orderStatus = "completed"
+        )
         {
-            if (memoryCache is null) throw new ArgumentNullException(nameof(memoryCache));
+            if (memoryCache is null)
+                throw new ArgumentNullException(nameof(memoryCache));
 
             const int itemsPerPage = 100; //Max: 100
 
@@ -60,10 +81,16 @@ namespace FindusWebApp.Helpers
                 throw new ArgumentNullException(nameof(dateFrom));
             }
 
-            var dateAfter = DateTime.ParseExact(dateFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            var dateBefore = DateTime.ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture).EndOfDay();
+            var dateAfter = DateTime.ParseExact(
+                dateFrom,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture
+            );
+            var dateBefore = DateTime
+                .ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture)
+                .EndOfDay();
 
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders-{pageNumber}x{itemsPerPage}-{orderStatus}";
+            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
@@ -71,56 +98,116 @@ namespace FindusWebApp.Helpers
                 var dateAfterOffset = dateAfter;
                 dateAfterOffset.AddDays(-12);
                 orders = new List<WcOrder>(itemsPerPage);
-                if (orders.Count >= itemsPerPage) throw new Exception("Assertion failed");
                 orders = await wcOrderApi.GetPage(
                     dateAfterOffset,
                     dateBefore,
                     pageNumber,
                     itemsPerPage,
                     orderStatus: orderStatus
-                    );
+                );
 
                 while (orders.Count >= itemsPerPage * pageNumber)
                 {
                     pageNumber++;
                     orders.EnsureCapacity(itemsPerPage * pageNumber);
-                    orders = orders.Concat(
-                        await wcOrderApi.GetPage(
-                            dateAfterOffset,
-                            dateBefore,
-                            pageNumber,
-                            itemsPerPage,
-                            orderStatus: orderStatus
+                    orders = orders
+                        .Concat(
+                            await wcOrderApi.GetPage(
+                                dateAfterOffset,
+                                dateBefore,
+                                pageNumber,
+                                itemsPerPage,
+                                orderStatus: orderStatus
+                            )
                         )
-                    ).ToList();
+                        .ToList();
                 }
 
                 //NOTE: Ensures that order payments falls within expected time period
                 orders.RemoveAll(o => o.date_paid < dateAfter || o.date_paid > dateBefore);
                 orders.TrimExcess();
 
+                // Store order id with date
+                if (dateAfter == dateBefore)
+                {
+                    orders.ForEach((o) => memoryCache.Set(o.id, dateAfter, _orderCacheOptions));
+                }
+
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }
             return orders;
         }
-        public static async Task<WcOrder> GetOrder(this WCObject.WCOrderItem wcOrderApi, OrderRouteModel orderRoute)
+
+        private static WcOrder TryGetCachedOrder(string orderId, IMemoryCache memoryCache)
         {
-            return await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status);
+            if (
+                memoryCache != null
+                && memoryCache.TryGetValue(orderId, out string dateAfter)
+                && memoryCache.TryGetValue(
+                    $"{dateAfter:yyyy-MM-dd}_{dateAfter:yyyy-MM-dd}-orders",
+                    out List<WcOrder> orders
+                )
+            )
+            {
+                return orders.First((o) => o.id.ToString() == orderId);
+            }
+            return null;
         }
-        public static async Task<WcOrder> GetOrder(this WCObject.WCOrderItem wcOrderApi, ulong? orderId, string orderStatus = "completed")
+
+        public static async Task<WcOrder> GetOrder(
+            this WCObject.WCOrderItem wcOrderApi,
+            OrderRouteModel orderRoute,
+            IMemoryCache memoryCache = null
+        )
+        {
+            // Try to get order from cache
+            var order = TryGetCachedOrder(orderRoute.OrderId, memoryCache);
+
+            return order ?? await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status, memoryCache);
+        }
+
+        public static async Task<WcOrder> GetOrder(
+            this WCObject.WCOrderItem wcOrderApi,
+            string orderId,
+            string orderStatus = "completed",
+            IMemoryCache memoryCache = null
+        )
         {
             if (orderId == null)
             {
                 throw new ArgumentNullException(paramName: nameof(orderId));
             }
-            var order = await wcOrderApi.Get((int)orderId, new Dictionary<string, string>{{"status", orderStatus}});
-            if(order?.status != orderStatus) {
-                if(order != null){
-                    throw new Exception($"Unexpected order status: '{order.status}' for order id: {order.id}\nExpected status: {orderStatus}");
-                } else {
-                    throw new Exception($"WooCommerce: Failed to get order: {orderId}, with status: ${orderStatus}");
+            if(memoryCache != null) {
+                if(memoryCache.TryGetValue(orderId, out WcOrder cachedOrder)) {
+                    return cachedOrder;
                 }
             }
+            var order = await wcOrderApi.Get(
+                (int)Convert.ToUInt64(orderId),
+                new Dictionary<string, string> { { "status", orderStatus } }
+            );
+            if (order?.status != orderStatus)
+            {
+                if (order != null)
+                {
+                    throw new Exception(
+                        $"Unexpected order status: '{order.status}' for order id: {order.id}\nExpected status: {orderStatus}"
+                    );
+                }
+                else if (order?.id != Convert.ToUInt64(orderId))
+                {
+                    throw new Exception(
+                        $"Order Id does not match: ${order?.id}, expected: ${orderId}"
+                    );
+                }
+                else
+                {
+                    throw new Exception(
+                        $"WooCommerce: Failed to get order: {orderId}, with status: ${orderStatus}"
+                    );
+                }
+            }
+            memoryCache?.Set(orderId, order, _orderCacheOptions);
             return order;
         }
     }

@@ -315,5 +315,15 @@
       "rate": 0.0,
       "account": 1580
     }
+  },
+  "NON_EU": {
+    "standard": {
+    "rate": 0.0,
+    "account": 3105
+    },
+    "reduced": {
+      "rate": 0.0,
+      "account": 3105
+    }
   }
 }

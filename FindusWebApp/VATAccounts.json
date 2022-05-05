@@ -317,13 +317,12 @@
     }
   },
   "NON_EU": {
-    "country": "NON_EU",
     "standard": {
-      "rate": 0,
-      "account": 3105
+    "rate": 0.0,
+    "account": 3105 
     },
     "reduced": {
-      "rate": 0,
+      "rate": 0.0,
       "account": 3105
     }
   }

@@ -6,21 +6,28 @@
 @if (@Model != null)
 {
 
-    <table style="max-width:75%;">
+    <table style="max-width:100%;font-size: small;">
     <tr>
         <th></th>
+        <th>Konto Nr.</th>
         <th>SKU</th>
-        <th>Kostnad</th><span>(Inkl. Moms)</span>
         <th>Kvantitet</th>
+        <th>Kostnad (Inkl. Moms)</th>
+        <th>VAT</th>
+        <th></th>
     </tr>
     @foreach (var row in @Model)
         {
             <tr>
                 <td style="background-color: lightgreen;"></td>
+                <td>@row.AccountNumber</td>
                 <td>@row.ArticleNumber</td>
-                <td>@($"{row.Price:F2}")</td>
                 <td>@row.DeliveredQuantity</td>
+                <td>@($"{row.Price:F2}") SEK</td>
+                <td>@($"{row.VAT:F2}%")</td>
+                <td>@row.Description</td>
             </tr>
         }
     </table>
 }
+

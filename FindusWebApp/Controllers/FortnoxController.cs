@@ -15,6 +15,7 @@ using System.Reflection;
 using System.Net.Http;
 using Fortnox.SDK.Search;
 using Fortnox.SDK.Interfaces;
+using FindusWebApp.Helpers;
 
 namespace FindusWebApp.Controllers
 {
@@ -36,6 +37,7 @@ namespace FindusWebApp.Controllers
             await Call(FetchCompanyName);
             // NOTE: Will redirect to "/Connect/Login" if Fornox is not authenticated:
             TempData["CustomerNr"] = customerNr;
+
             return await CallRedirect(GetCustomersPage);
         }
         private async Task Call(Action<FortnoxContext> action)
@@ -57,11 +59,7 @@ namespace FindusWebApp.Controllers
             }
             catch (FortnoxApiException ex)
             {
-                if (ex.ErrorInfo?.Message == "Invalid refresh token")
-                {
-                    return RedirectToAction("Login", "Connect", new { redirectUrl = "Fortnox" });
-                }
-                else if (ex.Message == "Fortnox Api not Connected")
+                if (ex.ErrorInfo?.Message == "Invalid refresh token" || ex.Message == "Fortnox Api not Connected")
                 {
                     return RedirectToAction("Login", "Connect", new { redirectUrl = "Fortnox" });
                 }
@@ -179,6 +177,15 @@ namespace FindusWebApp.Controllers
                 ViewBag.Error = ex.Message;
             }
             return new EmptyResult();
+        }
+        public async Task<IActionResult> DeleteCustomerAsync(string customerNr) {
+            TempData["CustomerNr"] = customerNr;
+            await Call(DeleteCustomer);
+            return RedirectToAction("Index");
+        }
+        private async void DeleteCustomer(FortnoxContext context) {
+            var customerNr = TempData["CustomerNr"] as string;
+            await context.Client.CustomerConnector.DeleteAsync(customerNr);
         }
     }
 }

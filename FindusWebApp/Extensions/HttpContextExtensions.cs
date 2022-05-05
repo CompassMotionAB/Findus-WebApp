@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Http;
 
 namespace FindusWebApp.Extensions
@@ -11,7 +10,7 @@ namespace FindusWebApp.Extensions
             string scheme = httpContext.Request.Scheme;
             string delimiter = System.Uri.SchemeDelimiter;
             string fullDomainToUse = scheme + delimiter + domain;
-            if(!string.IsNullOrEmpty(uri))
+            if (!string.IsNullOrEmpty(uri))
                 return fullDomainToUse + uri;
             return fullDomainToUse;
         }
