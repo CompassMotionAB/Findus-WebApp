@@ -10,10 +10,8 @@ using WooCommerceNET.WooCommerce.v2;
 using System.Net.Http;
 using Findus.Models;
 using System.Linq;
-using Newtonsoft.Json;
 using FindusWebApp.Models;
 using Microsoft.Extensions.Caching.Memory;
-using System.Globalization;
 using FindusWebApp.Helpers;
 using Microsoft.Extensions.Options;
 using Fortnox.SDK.Entities;
@@ -22,11 +20,7 @@ using FindusWebApp.Services.Fortnox;
 using Fortnox.SDK.Exceptions;
 using Fortnox.SDK.Search;
 using Customer = Fortnox.SDK.Entities.Customer;
-using MimeKit;
 using System.Threading;
-using System.IO;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.AspNetCore.Mvc.ViewEngines;
 using System.Net;
 using Fortnox.SDK.Interfaces;
 
@@ -315,7 +309,43 @@ namespace FindusWebApp.Controllers
                           : ex.Message
                     );
             }
-            return orders;
+            // Let's sort orders from newest to latest so that invoice & customer number
+            // increments the same as order id does
+            return orders.OrderBy(o => o.id).ToList();
+        }
+
+        private async Task<Invoice> CreateFullRefund(WcOrder order, long? invoiceRef = 0)
+        {
+            // Add new Credit Invoice to existing Invoice in Fortnox
+            return await AddCreditInvoiceToInvoice(
+                invoiceRef != 0 ? invoiceRef : order.GetInvoiceReference()
+            );
+        }
+
+        private static Dictionary<string, string> VerifyCanBeRefunded(
+            WcOrder order,
+            Invoice invoice,
+            Dictionary<string, string> errors = null
+        )
+        {
+            errors ??= new Dictionary<string, string>();
+            if (invoice == null)
+            {
+                errors?.Add(order.id.ToString(), "Invoice for Order does not exist in Fortnox.");
+            }
+            else if (invoice.Cancelled == true)
+            {
+                errors.Add(order.id.ToString(), "Invoice has been Cancelled in Fortnox.");
+            }
+            else if (invoice.Booked == true)
+            {
+                errors.Add(order.id.ToString(), "Invoice has not been Booked in Fortnox.");
+            }
+            else if (invoice.CreditInvoiceReference != 0)
+            {
+                errors.Add(order.id.ToString(), "Invoice already has a Credit Invoice in Fortnox.");
+            }
+            return errors;
         }
 
         public async Task<IActionResult> Refunds(
@@ -336,8 +366,20 @@ namespace FindusWebApp.Controllers
                 foreach (var order in orders)
                 {
                     var refundId = order.id.ToString();
-                    var invoiceRef = order.GetInvoiceReference();
-                    if (string.IsNullOrEmpty(invoiceRef))
+
+                    long? invoiceRef = 0;
+                    // TODO: This catch scope shouldn't be needed in production
+                    try
+                    {
+                        invoiceRef = order.GetInvoiceReference();
+                    }
+                    catch
+                    {
+                        var tmpInvoice = await GetInvoiceFromOrderId(refundId);
+                        invoiceRef = tmpInvoice?.DocumentNumber;
+                    }
+
+                    if (invoiceRef != 0)
                     {
                         errors.Add(refundId, "Order is missing reference to Fortnox Invoice.");
                     }
@@ -347,56 +389,28 @@ namespace FindusWebApp.Controllers
                         {
                             var invoice = await GetInvoiceFromReference(invoiceRef);
 
-                            if (invoice == null)
-                            {
-                                errors.Add(
-                                    refundId,
-                                    "Invoice for Order does not exist in Fortnox."
-                                );
-                            }
-                            else if (invoice.Cancelled != null && (bool)invoice.Cancelled)
-                            {
-                                errors.Add(
-                                    refundId,
-                                    "Invoice has already been Cancelled in Fortnox."
-                                );
-                            }
-                            else if (invoice.Booked != null && (bool)invoice.Booked)
-                            {
-                                errors.Add(refundId, "Invoice has not been Booked in Fortnox.");
-                            }
-                            else if (invoice.CreditInvoiceReference != null)
-                            {
-                                errors.Add(
-                                    refundId,
-                                    "Invoice already has a Credit Invoice in Fortnox."
-                                );
-                            }
-                            else
+                            errors = VerifyCanBeRefunded(order, invoice);
+
+                            if (errors.Count == 0)
                             {
                                 if (applyRefunds)
                                 {
-                                    // Add new Credit Invoice to existing Invoice in Fortnox
-                                    var creditInvoice = await AddCreditInvoiceToInvoice(
-                                        invoice.DocumentNumber
+                                    // Full refund
+                                    var invoiceWithCredit = await CreateFullRefund(
+                                        order,
+                                        invoiceRef
                                     );
-
-                                    if(creditInvoice.DocumentNumber == invoice.DocumentNumber) {
-                                        throw new Exception("Invoice Document Number matches the Credit Document Number.");
-                                    }
-
-                                    // Update items with purchase accounts, instead of sales
-                                    // invoice.SetInvoiceRows(order, _accounts, refund: true);
 
                                     // Add external reference to order ID
-                                    invoice.ExternalInvoiceReference2 = refundId;
+                                    // invoice.ExternalInvoiceReference2 = refundId;
+                                    // await UpdateInvoice(invoice);
 
-                                    await UpdateInvoice(invoice);
-
+                                    /*
                                     await _wcOrderApi.AddInvoiceReferenceAsync(
                                         refundId,
-                                        invoice.CreditInvoiceReference
+                                        invoiceWithCredit.CreditInvoiceReference
                                     );
+                                    */
                                 }
 
                                 invoices.Add(refundId, invoice);
@@ -408,6 +422,15 @@ namespace FindusWebApp.Controllers
                         }
                     }
                 }
+
+                /*
+                // Get partially refunded orders
+                var creditInvoiceRef = invoiceWithCredit.CreditInvoiceReference;
+
+                // Partial Refund
+                var creditInvoice = await GetInvoiceFromReference(creditInvoiceRef);
+                var updatedCreditInvoice = new Invoice().SetInvoiceRows(order, _accounts);
+                */
 
                 _orderViewModel = new OrderViewModel(
                     orders,
@@ -617,23 +640,22 @@ namespace FindusWebApp.Controllers
         private async void UploadPDFToFortnox(FortnoxContext context)
         {
             if (TempData["pdf"] is not byte[] pdf)
-            {
                 throw new Exception("PDF data missing for upload.");
-            }
-            if (TempData["documentNr"] is not long documentNr)
-            {
+            if (TempData["invoiceNr"] is not long invoiceNr)
                 throw new Exception("Document number missing for PDF upload.");
-            }
+            if (TempData["orderId"] is not string orderId)
+                throw new Exception("Order Id is missing for PDF upload.");
+
             var connector = context.Client.InvoiceFileConnectionConnector;
             var inboxConnector = context.Client.InboxConnector;
             var tmpFile = await inboxConnector.UploadFileAsync(
-                "tmpInvoiceFile.pdf",
+                $"invoice-{orderId}.pdf",
                 pdf,
                 StaticFolders.CustomerInvoices
             );
             var newInvoiceFileConnection = new InvoiceFileConnection()
             {
-                EntityId = documentNr,
+                EntityId = invoiceNr,
                 FileId = tmpFile.ArchiveFileId,
                 IncludeOnSend = false,
                 EntityType = EntityType.Invoice
@@ -641,18 +663,38 @@ namespace FindusWebApp.Controllers
             await connector.CreateAsync(newInvoiceFileConnection);
         }
 
-        private async void UploadPDF(byte[] pdf, long? documentNr)
+        private async Task UploadPDF(byte[] pdf, long? invoiceNr, ulong orderId)
         {
             TempData["pdf"] = pdf;
-            TempData["documentNr"] = documentNr;
+            TempData["invoiceNr"] = invoiceNr;
+            TempData["orderId"] = orderId.ToString();
             await Call(UploadPDFToFortnox);
         }
 
-        public void FetchCompanyName(FortnoxContext context)
+        private void FetchCompanyName(FortnoxContext context)
         {
             var client = context.Client;
             var conn = client.CompanyInformationConnector;
             ViewData["CompanyName"] = conn.GetAsync().Result.CompanyName;
+        }
+
+        public async Task<IActionResult> AddMissingPDF(string orderId = null)
+        {
+            if (string.IsNullOrEmpty(orderId))
+                return new BadRequestResult();
+
+            var order = await Get(orderId);
+            if (!order.HasDocumentLink())
+            {
+                return new BadRequestResult();
+            }
+            var invoice = await GetInvoiceFromOrderId(orderId);
+            if (invoice == null)
+                return new BadRequestResult();
+
+            var pdf = await FetchFile(order.TryGetDocumentLink());
+            await UploadPDF(pdf, invoice.DocumentNumber, Convert.ToUInt64(orderId));
+            return View("Findus");
         }
 
         [HttpGet]
@@ -676,7 +718,7 @@ namespace FindusWebApp.Controllers
                     }
                     catch
                     {
-                        if (orderRoute.HasDateRange())
+                        if (orderRoute.HasDateRange() && string.IsNullOrEmpty(orderRoute.OrderId))
                         {
                             return await CallRedirect(
                                 FetchCompanyName,
@@ -702,70 +744,73 @@ namespace FindusWebApp.Controllers
                 var orders = await Get(orderRoute);
                 foreach (var order in orders)
                 {
-                    var hasOrder = await FortnoxHasOrder(order.id.ToString());
-                    if (hasOrder)
+                    //var hasOrder = await FortnoxHasOrder(order.id.ToString());
+                    var invoice = await GetInvoiceFromOrderId(order.id.ToString());
+                    if (invoice != null)
                     {
-                        errors.Add(
+                        warnings.Add(
                             order.id.ToString(),
                             $"Order {order.id}\nalready exists on Fortnox."
                         );
                     }
                     else
                     {
-                        //ViewBag.Error = $"Order Id: {order.id} already exists in Fortnox.";
-                        //return View("Findus");
-                        //return RedirectToAction("Orders", new { order.id, dateFrom, dateTo });
-
-                        decimal currencyRate = await GetCurrencyRate(order);
-                        VerificationModel verification = VerificationUtils.Verify(
-                            order,
-                            _accounts,
-                            currencyRate
-                        );
-                        if (verification.IsValid())
+                        try
                         {
-                            try
+                            decimal currencyRate = await GetCurrencyRate(order);
+                            VerificationModel verification = VerificationUtils.Verify(
+                                order,
+                                _accounts,
+                                currencyRate
+                            );
+                            if (verification.IsValid())
                             {
-                                ViewBag.Error = null;
-
-                                if (order.HasDocumentLink())
+                                try
                                 {
-                                    verification.PdfLink = order.TryGetDocumentLink();
+                                    ViewBag.Error = null;
 
-                                    var success = await SendToFortnox(verification);
-                                    if (!success || !String.IsNullOrEmpty(ViewBag.Error))
+                                    if (order.HasDocumentLink())
                                     {
-                                        errors.Add(order.id.ToString(), ViewBag.Error);
+                                        verification.PdfLink = order.TryGetDocumentLink();
+
+                                        var success = await SendToFortnox(verification);
+                                        if (!success || !string.IsNullOrEmpty(ViewBag.Error))
+                                        {
+                                            errors.Add(order.id.ToString(), ViewBag.Error);
+                                        }
+                                        else if (success)
+                                        {
+                                            warnings.Add(
+                                                order.id.ToString(),
+                                                "Order finns nu i Fortnox"
+                                            );
+                                        }
                                     }
-                                    else if (success)
+                                    else
                                     {
-                                        warnings.Add(
+                                        errors.Add(
                                             order.id.ToString(),
-                                            "Order finns nu i Fortnox"
+                                            "Order is missing PDF Invoice link or Order Key"
                                         );
                                     }
                                 }
-                                else
+                                catch (Exception ex)
                                 {
-                                    errors.Add(
-                                        order.id.ToString(),
-                                        "Order is missing PDF Invoice link"
-                                    );
+                                    ViewBag.Error =
+                                        $"{ViewBag.Error} - {ex.InnerException?.Message}";
                                 }
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                ViewBag.Error = $"{ViewBag.Error} - {ex.InnerException?.Message}";
+                                errors.Add(
+                                    order.id.ToString(),
+                                    $"{order.id}\n{verification.Error}"
+                                );
                             }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            //return await Orders(orderId, dateFrom, dateTo);
-                            //ViewBag.Error ??= $"Failed to verify order: {order.id}\n{verification.Error}";
-
-                            errors.Add(order.id.ToString(), $"{order.id}\n{verification.Error}");
-                            //return View("Findus");
-                            //return RedirectToAction("Orders", new { order.id, dateFrom, dateTo });
+                            errors.Add(order.id.ToString(), ex.Message);
                         }
                     }
                 }
@@ -796,11 +841,6 @@ namespace FindusWebApp.Controllers
                 {
                     var customer = verification.Customer;
                     TempData["Customer"] = customer;
-                    //customerNr = await TryGetCustomerNr(customer.Email);
-                    //if (!string.IsNullOrEmpty(customerNr))
-                    //{
-                    //customer.CustomerNumber = customerNr;
-                    //}
                     customerNr = await UpdateCustomerAsync(customer);
 
                     TempData["CustomerNr"] = customerNr ?? TempData["CustomerNr"];
@@ -892,19 +932,26 @@ namespace FindusWebApp.Controllers
         private async void TryGetInvoice(FortnoxContext context)
         {
             var orderId = TempData.Peek("OrderId") as string;
+            var hasOrder = false;
             var invoiceCon = context.Client.InvoiceConnector;
             var invoiceSubset = await invoiceCon.FindAsync(
                 new InvoiceSearch { YourOrderNumber = orderId }
             );
+
+            // TODO: TEMPORARY:
+            /*
             if (invoiceSubset?.Entities.Count > 1)
             {
                 throw new Exception("Flera kunder med samma Email existerar i Fortnox.");
+            } else*/if (invoiceSubset?.Entities.Count == 1)
+            {
+                TempData["InvoiceNumber"] = invoiceSubset?.Entities[0].DocumentNumber.ToString();
+                hasOrder = true;
             }
-            TempData["InvoiceNumber"] = invoiceSubset?.Entities[0].DocumentNumber.ToString();
-            TempData["HasOrder"] = invoiceSubset?.Entities.Count > 0;
+            TempData["HasOrder"] = hasOrder;
         }
 
-        private async Task<Invoice> GetInvoiceFromReference(string invoiceNumber)
+        private async Task<Invoice> GetInvoiceFromReference(long? invoiceNumber)
         {
             TempData["InvoiceNumber"] = invoiceNumber;
             await Call(GetInvoiceFromReferenceFortnox);
@@ -914,19 +961,28 @@ namespace FindusWebApp.Controllers
 
         private async void GetInvoiceFromReferenceFortnox(FortnoxContext context)
         {
-            var invoiceNumber = TempData["InvoiceNumber"] as string;
+            var invoiceNumber = TempData["InvoiceNumber"] as long?;
             var invoiceCon = context.Client.InvoiceConnector;
-            TempData["Invoice"] = await invoiceCon.GetAsync(Convert.ToInt64(invoiceNumber));
+            // TempData["Invoice"] = await invoiceCon.GetAsync(Convert.ToInt64(invoiceNumber));
+             TempData["Invoice"] = await invoiceCon.GetAsync(invoiceNumber);
         }
 
-        private async void GetInvoiceFortnox(FortnoxContext context)
+        private async Task<InvoiceSubset> GetInvoiceFromOrderId(string orderId)
+        {
+            TempData["OrderId"] = orderId;
+            await Call(GetInvoiceFromOrderIdFortnox);
+            Thread.Sleep(1600);
+            return TempData["InvoiceSubset"] as InvoiceSubset;
+        }
+
+        private async void GetInvoiceFromOrderIdFortnox(FortnoxContext context)
         {
             var orderId = TempData.Peek("OrderId") as string;
             var invoiceCon = context.Client.InvoiceConnector;
             var invoiceSubset = await invoiceCon.FindAsync(
                 new InvoiceSearch { YourOrderNumber = orderId }
             );
-            TempData["InvoiceOnce"] = invoiceSubset?.Entities.FirstOrDefault();
+            TempData["InvoiceSubset"] = invoiceSubset?.Entities.FirstOrDefault();
         }
 
         private async Task<Invoice> AddCreditInvoiceToInvoice(long? invoiceNumber)
@@ -1026,7 +1082,6 @@ namespace FindusWebApp.Controllers
         public async Task<bool> FortnoxHasOrder(string orderId = null)
         {
             TempData["OrderId"] = orderId;
-            //TempData["HasOrder"] = false;
             await Call(TryGetInvoice);
             // TODO: Neccessary for TempData to be assigned, apparently?
             Thread.Sleep(600);
@@ -1107,33 +1162,39 @@ namespace FindusWebApp.Controllers
             }
         }
 
+        private async Task<byte[]> FetchFile(string fileLink)
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var pdf = await httpClient.FetchFile(fileLink);
+            httpClient.Dispose();
+            return pdf;
+        }
+
         private async void CreateFortnoxInvoice(FortnoxContext context)
         {
-            if (TempData["Invoice"] is not Invoice invoice || invoice == null)
+            if (TempData["Invoice"] is not Invoice invoice)
                 throw new Exception("Invoice is not defined.");
 
             var invoiceCon = context.Client.InvoiceConnector;
             try
             {
-                // TODO: Make sure Fortnox has added alla Articles needed for invoice
-                Thread.Sleep(3000);
                 invoice = await invoiceCon.CreateAsync(invoice);
+                /*
                 await _wcOrderApi.AddInvoiceReferenceAsync(
                     invoice.YourOrderNumber,
                     invoice.DocumentNumber
                 );
+                */
 
                 // Send PDF Invoice
                 if (TempData["PdfLink"] is string pdfLink)
                 {
-                    var uri = WebUtility.HtmlDecode(pdfLink);
-                    var httpClient = _httpClientFactory.CreateClient();
-                    var response = await httpClient.GetAsync(uri);
-                    response.EnsureSuccessStatusCode();
-                    ///var pdf = httpClient.DownloadData(uri);
-                    var pdf = await response.Content.ReadAsByteArrayAsync();
-                    UploadPDF(pdf, invoice.DocumentNumber);
-                    httpClient.Dispose();
+                    var pdf = await FetchFile(pdfLink);
+                    await UploadPDF(
+                        pdf,
+                        invoice.DocumentNumber,
+                        Convert.ToUInt64(invoice.YourOrderNumber)
+                    );
                 }
             }
             catch (Exception ex)

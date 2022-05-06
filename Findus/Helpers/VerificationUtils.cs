@@ -162,6 +162,7 @@ namespace Findus.Helpers
 
                 YourOrderNumber = order.id.ToString(),
                 //YourReference = order.customer_id?.ToString(), //TODO: Should this be used?
+                OurReference = "Findus",
 
                 ExternalInvoiceReference1 = order.id?.ToString(),
                 InvoiceRows = invoiceRows,
@@ -258,11 +259,11 @@ namespace Findus.Helpers
             total += (decimal)(order.shipping_total + order.shipping_tax);
 
             var diff = MathF.Abs((float)(total - order.total));
-            // Should not deviate more than 0.001 from WooCommerce total cost
-            if (diff > 0.001)
+            // Should not deviate more than 0.005 from WooCommerce total cost
+            if (diff > 0.005)
             {
                 throw new Exception(
-                    $"WooCommerce order total does not match calculated total. Difference: {total:0.5F}, {order.total:0.5F} = {diff:0.5F}"
+                    $"WooCommerce order total does not match calculated total. Difference: {total:0.00}, {order.total:0.00} = {diff:0.000}"
                 );
             }
             return total;
@@ -580,7 +581,7 @@ namespace Findus.Helpers
                     item.quantity ?? 1, // TODO: Is this safe to assume?
                     price: item.GetTotalWithTax(),
                     vat: salesAcc.Rate * 100M,
-                    info: $"{item.name}"
+                    info: $"{item.name.SanitizeStringForFortnox()}"
                 //info: $"Försäljning - {taxLabel}"
                 );
             }

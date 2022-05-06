@@ -65,7 +65,8 @@ namespace FindusWebApp.Helpers
             string dateTo = null,
             IMemoryCache memoryCache = null,
             int pageNumber = 1,
-            string orderStatus = "completed"
+            string orderStatus = "completed",
+            string cacheKeyData = ""
         )
         {
             if (memoryCache is null)
@@ -90,7 +91,7 @@ namespace FindusWebApp.Helpers
                 .ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture)
                 .EndOfDay();
 
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders";
+            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders{cacheKeyData}";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
@@ -135,6 +136,26 @@ namespace FindusWebApp.Helpers
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }
+
+            return orders;
+        }
+
+        public static async Task<List<WcOrder>> GetPartialRefunds(
+            this WCObject.WCOrderItem wcOrderApi,
+            OrderRouteModel orderRoute,
+            IMemoryCache memoryCache = null
+        )
+        {
+            var orders = await wcOrderApi.GetOrders(
+                orderRoute.DateFrom,
+                orderRoute.DateTo,
+                memoryCache
+            );
+
+            foreach(var order in orders) {
+
+            }
+
             return orders;
         }
 
@@ -213,6 +234,9 @@ namespace FindusWebApp.Helpers
             memoryCache?.Set(orderId, order, _orderCacheOptions);
             return order;
         }
+
+
+       
 
         public static async Task AddInvoiceReferenceAsync(
             this WCObject.WCOrderItem wcOrderApi,
