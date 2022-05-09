@@ -195,6 +195,42 @@ namespace Findus.Helpers
             return invoice;
         }
 
+        public static bool CanBeRefunded(
+            WcOrder order,
+            Invoice invoice,
+            ref Dictionary<string, string> errors
+        )
+        {
+            if(order.status == "completed" && order.refunds?.Count == 0) {
+                errors?.Add(order.id.ToString(), "Order status is 'completed' and is not partially refunded.");
+                return false;
+            } else if (order.status != "refunded") {
+                errors?.Add(order.id.ToString(), $"Order status is '{order.status}', expected 'refunded' or 'completed' with partial refund.");
+                return false;
+            }
+             else if (invoice == null)
+            {
+                errors?.Add(order.id.ToString(), "Invoice for Order does not exist in Fortnox.");
+                return false;
+            }
+            else if (invoice.Cancelled == true)
+            {
+                errors.Add(order.id.ToString(), "Invoice has been Cancelled in Fortnox.");
+                return false;
+            }
+            else if (invoice.Booked == true)
+            {
+                errors.Add(order.id.ToString(), "Invoice has not been Booked in Fortnox.");
+                return false;
+            }
+            else if (invoice.CreditInvoiceReference != 0)
+            {
+                errors.Add(order.id.ToString(), "Invoice already has a Credit Invoice in Fortnox.");
+                return false;
+            }
+            return true;
+        }
+
         // NOTE: Only used in testing
         public static Invoice TryCreateRefundInvoice(
             WcOrder order,

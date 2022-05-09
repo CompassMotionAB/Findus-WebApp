@@ -309,53 +309,54 @@ namespace FindusWebApp.Controllers
                           : ex.Message
                     );
             }
-            // Let's sort orders from newest to latest so that invoice & customer number
-            // increments the same as order id does
+            // Let's sort orders from newest to latest so that
+            // invoice & customer number ascends the same way
+            // as order id
             return orders.OrderBy(o => o.id).ToList();
         }
 
-        private async Task<Invoice> CreateFullRefund(WcOrder order, long? invoiceRef = 0)
+        private async Task<Invoice> CreatePartialRefund(WcOrder order, Invoice invoice)
         {
-            // Add new Credit Invoice to existing Invoice in Fortnox
-            return await AddCreditInvoiceToInvoice(
-                invoiceRef != 0 ? invoiceRef : order.GetInvoiceReference()
-            );
+            var creditInvoice = await AddCreditInvoiceToInvoice(invoice.DocumentNumber);
+
+            var updateInvoice = new Invoice()
+            {
+                DocumentNumber = creditInvoice.DocumentNumber
+            }.SetInvoiceRows(order, _accounts);
+
+            return await UpdateInvoice(updateInvoice);
         }
 
-        private static Dictionary<string, string> VerifyCanBeRefunded(
-            WcOrder order,
-            Invoice invoice,
-            Dictionary<string, string> errors = null
-        )
+        private async Task<Invoice> CreateFullRefund(WcOrder order, long? invoiceRef = null)
         {
-            errors ??= new Dictionary<string, string>();
-            if (invoice == null)
+            // Create new Credit Invoice to existing Invoice in Fortnox
+            return await AddCreditInvoiceToInvoice(invoiceRef ?? order.GetInvoiceReference());
+        }
+
+        private async Task<long?> GetInvoiceReference(WcOrder order)
+        {
+            long? invoiceRef;
+            // TODO: This catch scope shouldn't be needed in production
+            // since GetInvoiceReference should work then.
+            try
             {
-                errors?.Add(order.id.ToString(), "Invoice for Order does not exist in Fortnox.");
+                invoiceRef = order.GetInvoiceReference();
             }
-            else if (invoice.Cancelled == true)
+            catch
             {
-                errors.Add(order.id.ToString(), "Invoice has been Cancelled in Fortnox.");
+                var tmpInvoice = await GetInvoiceFromOrderId(order.id.ToString());
+                invoiceRef = tmpInvoice?.DocumentNumber;
             }
-            else if (invoice.Booked == true)
-            {
-                errors.Add(order.id.ToString(), "Invoice has not been Booked in Fortnox.");
-            }
-            else if (invoice.CreditInvoiceReference != 0)
-            {
-                errors.Add(order.id.ToString(), "Invoice already has a Credit Invoice in Fortnox.");
-            }
-            return errors;
+            return invoiceRef;
         }
 
         public async Task<IActionResult> Refunds(
-            string orderId = null,
             string dateFrom = null,
             string dateTo = null,
             bool applyRefunds = false
         )
         {
-            var orderRoute = new OrderRouteModel(orderId, dateFrom, dateTo, "refunded");
+            var orderRoute = new OrderRouteModel(orderId: null, dateFrom, dateTo, "refunded");
             if (orderRoute.IsValid())
             {
                 var orders = await Get(orderRoute);
@@ -365,23 +366,13 @@ namespace FindusWebApp.Controllers
 
                 foreach (var order in orders)
                 {
-                    var refundId = order.id.ToString();
+                    var orderId = order.id.ToString();
 
-                    long? invoiceRef = 0;
-                    // TODO: This catch scope shouldn't be needed in production
-                    try
-                    {
-                        invoiceRef = order.GetInvoiceReference();
-                    }
-                    catch
-                    {
-                        var tmpInvoice = await GetInvoiceFromOrderId(refundId);
-                        invoiceRef = tmpInvoice?.DocumentNumber;
-                    }
+                    long? invoiceRef = await GetInvoiceReference(order);
 
-                    if (invoiceRef != 0)
+                    if (!invoiceRef.HasValue)
                     {
-                        errors.Add(refundId, "Order is missing reference to Fortnox Invoice.");
+                        errors.Add(orderId, "Order is missing reference to Fortnox Invoice.");
                     }
                     else
                     {
@@ -389,9 +380,7 @@ namespace FindusWebApp.Controllers
                         {
                             var invoice = await GetInvoiceFromReference(invoiceRef);
 
-                            errors = VerifyCanBeRefunded(order, invoice);
-
-                            if (errors.Count == 0)
+                            if(VerificationUtils.CanBeRefunded(order, invoice, ref errors))
                             {
                                 if (applyRefunds)
                                 {
@@ -413,24 +402,81 @@ namespace FindusWebApp.Controllers
                                     */
                                 }
 
-                                invoices.Add(refundId, invoice);
+                                invoices.Add(orderId, invoice);
                             }
                         }
                         catch (Exception ex)
                         {
-                            errors.Add(refundId, ex.InnerException?.Message ?? ex.Message);
+                            errors.Add(orderId, ex.InnerException?.Message ?? ex.Message);
                         }
                     }
                 }
 
-                /*
                 // Get partially refunded orders
-                var creditInvoiceRef = invoiceWithCredit.CreditInvoiceReference;
 
-                // Partial Refund
-                var creditInvoice = await GetInvoiceFromReference(creditInvoiceRef);
-                var updatedCreditInvoice = new Invoice().SetInvoiceRows(order, _accounts);
-                */
+                var partialOrders = await _wcOrderApi.GetPartialRefundedOrders(
+                    dateFrom,
+                    dateTo,
+                    _memoryCache
+                );
+
+                foreach (var order in partialOrders)
+                {
+                    var orderId = order.id.ToString();
+
+                    long? invoiceRef = await GetInvoiceReference(order);
+
+                    if (!invoiceRef.HasValue)
+                    {
+                        errors.Add(orderId, "Order is missing reference to Fortnox Invoice.");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var invoice = await GetInvoiceFromReference(invoiceRef);
+
+
+                            if(VerificationUtils.CanBeRefunded(order, invoice, ref errors))
+                            {
+                                warnings.Add(orderId, "This is a Partial refund.");
+                                if (applyRefunds)
+                                {
+                                    // Partial refund
+                                    var invoiceWithCredit = await CreatePartialRefund(
+                                        order,
+                                        invoice
+                                    );
+
+                                    // Add external reference to order ID
+                                    // invoice.ExternalInvoiceReference2 = refundId;
+                                    // await UpdateInvoice(invoice);
+
+                                    /*
+                                    await _wcOrderApi.AddInvoiceReferenceAsync(
+                                        refundId,
+                                        invoiceWithCredit.CreditInvoiceReference
+                                    );
+                                    */
+                                }
+
+                                invoices.Add(orderId, invoice);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add(orderId, ex.InnerException?.Message ?? ex.Message);
+                        }
+                    }
+
+                    /*
+                    var creditInvoiceRef = invoiceWithCredit.CreditInvoiceReference;
+
+                    // Partial Refund
+                    var creditInvoice = await GetInvoiceFromReference(creditInvoiceRef);
+                    var updatedCreditInvoice = new Invoice().SetInvoiceRows(order, _accounts);
+                    */
+                }
 
                 _orderViewModel = new OrderViewModel(
                     orders,
@@ -964,7 +1010,7 @@ namespace FindusWebApp.Controllers
             var invoiceNumber = TempData["InvoiceNumber"] as long?;
             var invoiceCon = context.Client.InvoiceConnector;
             // TempData["Invoice"] = await invoiceCon.GetAsync(Convert.ToInt64(invoiceNumber));
-             TempData["Invoice"] = await invoiceCon.GetAsync(invoiceNumber);
+            TempData["Invoice"] = await invoiceCon.GetAsync(invoiceNumber);
         }
 
         private async Task<InvoiceSubset> GetInvoiceFromOrderId(string orderId)

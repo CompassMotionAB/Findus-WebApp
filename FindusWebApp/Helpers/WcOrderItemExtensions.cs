@@ -140,25 +140,6 @@ namespace FindusWebApp.Helpers
             return orders;
         }
 
-        public static async Task<List<WcOrder>> GetPartialRefunds(
-            this WCObject.WCOrderItem wcOrderApi,
-            OrderRouteModel orderRoute,
-            IMemoryCache memoryCache = null
-        )
-        {
-            var orders = await wcOrderApi.GetOrders(
-                orderRoute.DateFrom,
-                orderRoute.DateTo,
-                memoryCache
-            );
-
-            foreach(var order in orders) {
-
-            }
-
-            return orders;
-        }
-
         private static WcOrder TryGetCachedOrder(string orderId, IMemoryCache memoryCache)
         {
             if (
@@ -235,8 +216,52 @@ namespace FindusWebApp.Helpers
             return order;
         }
 
+        public static async Task<IEnumerable<WcOrder>> TryGetPartialRefundedOrders(
+            this WCObject.WCOrderItem wcOrderApi,
+            OrderRouteModel orderRoute,
+            IMemoryCache memoryCache = null,
+            int pageNumber = 1,
+            string orderStatus = "completed"
+        )
+        {
+            if (!orderRoute.IsValid())
+                throw new Exception("Order route is not valid.");
+            List<WcOrder> orders;
+            if (orderRoute.HasDateRange())
+            {
+                orders = await wcOrderApi.GetOrders(
+                    orderRoute.DateFrom,
+                    orderRoute.DateTo,
+                    memoryCache,
+                    pageNumber,
+                    orderStatus
+                );
+            }
+            else
+            {
+                orders = new List<WcOrder> { await wcOrderApi.Get(orderRoute.OrderId) };
+            }
+            return orders.FindAll(o => o.refunds?.Count > 0);
+        }
 
-       
+        public static async Task<IEnumerable<WcOrder>> GetPartialRefundedOrders(
+            this WCObject.WCOrderItem wcOrderApi,
+            string dateFrom = null,
+            string dateTo = null,
+            IMemoryCache memoryCache = null,
+            int pageNumber = 1,
+            string orderStatus = "completed"
+        )
+        {
+            var orders = await wcOrderApi.GetOrders(
+                dateFrom,
+                dateTo,
+                memoryCache,
+                pageNumber,
+                orderStatus
+            );
+            return orders.FindAll(o => o.refunds?.Count > 0);
+        }
 
         public static async Task AddInvoiceReferenceAsync(
             this WCObject.WCOrderItem wcOrderApi,
