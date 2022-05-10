@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Findus.Models;
 using Fortnox.SDK.Entities;
+using WooCommerceNET.WooCommerce.v2;
 using WcOrder = WooCommerceNET.WooCommerce.v2.Order;
 
 namespace Findus.Helpers
@@ -41,20 +42,28 @@ namespace Findus.Helpers
 
             invoice.InvoiceRows.Add(newRow);
         }
-
         public static Invoice SetInvoiceRows(
             this Invoice invoice,
             WcOrder order,
             AccountsModel accounts,
-            bool refund = false
+            OrderRefund refund
+        )
+        {
+            foreach(var item in refund.line_items) {
+                var acc = accounts.GetSalesAccount(order);
+            }
+            return invoice;
+        }
+        public static Invoice SetInvoiceRows(
+            this Invoice invoice,
+            WcOrder order,
+            AccountsModel accounts
         )
         {
             var rows = new List<InvoiceRow>();
             foreach (var item in order.line_items)
             {
-                var account = refund
-                    ? accounts.GetPurchaseAccount(order, item)
-                    : accounts.GetSalesAccount(order, item);
+                var account = accounts.GetSalesAccount(order, item);
                 rows.Add(
                     new InvoiceRow
                     {
@@ -63,7 +72,7 @@ namespace Findus.Helpers
                         Price = item.price,
                         Discount = 0,
                         ArticleNumber = item.sku,
-                        Description = item.SanitizeNameForFortnox()
+                        Description = FortnoxStringUtil.SanitizeStringForFortnox(item.name)
                     }
                 );
             }

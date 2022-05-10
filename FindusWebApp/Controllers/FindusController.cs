@@ -315,16 +315,29 @@ namespace FindusWebApp.Controllers
             return orders.OrderBy(o => o.id).ToList();
         }
 
-        private async Task<Invoice> CreatePartialRefund(WcOrder order, Invoice invoice)
+        private async Task<Invoice> TryCreatePartialRefund(WcOrder order, Invoice invoice)
         {
             var creditInvoice = await AddCreditInvoiceToInvoice(invoice.DocumentNumber);
+
+            var refunds = await _wcOrderApi.Refunds.GetAll(order.id);
+
+            if (refunds.Count != 0)
+            {
+                throw new Exception("Order is missing refunds");
+            }
+            else if (refunds.Count != 1)
+            {
+                throw new Exception("Partial Refund for previously refunded order is not supported.");
+            }
 
             var updateInvoice = new Invoice()
             {
                 DocumentNumber = creditInvoice.DocumentNumber
-            }.SetInvoiceRows(order, _accounts);
+            }.SetInvoiceRows(order, _accounts, refunds[0]);
 
-            return await UpdateInvoice(updateInvoice);
+            return updateInvoice;
+            // TODO: make sure invoice is correct before we upload
+            // return await UpdateInvoice(updateInvoice);
         }
 
         private async Task<Invoice> CreateFullRefund(WcOrder order, long? invoiceRef = null)
@@ -380,7 +393,7 @@ namespace FindusWebApp.Controllers
                         {
                             var invoice = await GetInvoiceFromReference(invoiceRef);
 
-                            if(VerificationUtils.CanBeRefunded(order, invoice, ref errors))
+                            if (VerificationUtils.CanBeRefunded(order, invoice, ref errors))
                             {
                                 if (applyRefunds)
                                 {
@@ -436,14 +449,13 @@ namespace FindusWebApp.Controllers
                         {
                             var invoice = await GetInvoiceFromReference(invoiceRef);
 
-
-                            if(VerificationUtils.CanBeRefunded(order, invoice, ref errors))
+                            if (VerificationUtils.CanBeRefunded(order, invoice, ref errors))
                             {
                                 warnings.Add(orderId, "This is a Partial refund.");
                                 if (applyRefunds)
                                 {
                                     // Partial refund
-                                    var invoiceWithCredit = await CreatePartialRefund(
+                                    var invoiceWithCredit = await TryCreatePartialRefund(
                                         order,
                                         invoice
                                     );
@@ -1188,7 +1200,7 @@ namespace FindusWebApp.Controllers
                             {
                                 ArticleNumber = item.sku,
                                 Type = ArticleType.Stock,
-                                Description = item.name.SanitizeStringForFortnox()
+                                Description = FortnoxStringUtil.SanitizeStringForFortnox(item.name)
                             }
                         );
                     }

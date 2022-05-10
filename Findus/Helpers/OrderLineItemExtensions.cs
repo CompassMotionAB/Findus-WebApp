@@ -19,10 +19,5 @@ namespace Findus.Helpers
             }
             return item.tax_class == "reduced-rate";
         }
-
-        public static string SanitizeNameForFortnox(this OrderLineItem item)
-        {
-            return item.name.SanitizeStringForFortnox();
-        }
     }
 }

@@ -163,7 +163,6 @@ namespace Findus.Helpers
                 YourOrderNumber = order.id.ToString(),
                 //YourReference = order.customer_id?.ToString(), //TODO: Should this be used?
                 OurReference = "Findus",
-
                 ExternalInvoiceReference1 = order.id?.ToString(),
                 InvoiceRows = invoiceRows,
             }
@@ -201,14 +200,23 @@ namespace Findus.Helpers
             ref Dictionary<string, string> errors
         )
         {
-            if(order.status == "completed" && order.refunds?.Count == 0) {
-                errors?.Add(order.id.ToString(), "Order status is 'completed' and is not partially refunded.");
-                return false;
-            } else if (order.status != "refunded") {
-                errors?.Add(order.id.ToString(), $"Order status is '{order.status}', expected 'refunded' or 'completed' with partial refund.");
+            if (order.status == "completed" && order.refunds?.Count == 0)
+            {
+                errors?.Add(
+                    order.id.ToString(),
+                    "Order status is 'completed' and is not partially refunded."
+                );
                 return false;
             }
-             else if (invoice == null)
+            else if (order.status != "refunded")
+            {
+                errors?.Add(
+                    order.id.ToString(),
+                    $"Order status is '{order.status}', expected 'refunded' or 'completed' with partial refund."
+                );
+                return false;
+            }
+            else if (invoice == null)
             {
                 errors?.Add(order.id.ToString(), "Invoice for Order does not exist in Fortnox.");
                 return false;
@@ -617,7 +625,7 @@ namespace Findus.Helpers
                     item.quantity ?? 1, // TODO: Is this safe to assume?
                     price: item.GetTotalWithTax(),
                     vat: salesAcc.Rate * 100M,
-                    info: $"{item.name.SanitizeStringForFortnox()}"
+                    info: FortnoxStringUtil.SanitizeStringForFortnox(item.name)
                 //info: $"Försäljning - {taxLabel}"
                 );
             }
