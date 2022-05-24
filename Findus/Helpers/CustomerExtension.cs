@@ -8,7 +8,11 @@ namespace Findus.Helpers
         {
             if (VerificationUtils.IsInsideEU(countryIso))
             {
-                customer.VATType = CustomerVATType.EU_VAT;
+                customer.VATType = countryIso switch
+                {
+                    "SE" => customer.VATType = CustomerVATType.SE_VAT,
+                    _ => CustomerVATType.EU_VAT,
+                };
             }
             else
             {
