@@ -12,11 +12,7 @@ namespace Findus.Helpers
             }
             else
             {
-                customer.VATType = countryIso.ToUpper() switch
-                {
-                    "SE" => CustomerVATType.SE_VAT,
-                    _ => CustomerVATType.Export,
-                };
+                customer.VATType = CustomerVATType.Export;
             }
             return customer;
         }
