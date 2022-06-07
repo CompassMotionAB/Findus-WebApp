@@ -16,7 +16,7 @@ namespace Findus.Helpers
                 );
         }
 
-        public static string TryGetDocumentLink(this Order order)
+        public static string TryGetDocumentLink(this Order order, string storefrontUrl)
         {
             string pdfLink =
                 order.meta_data.Find(m => m.key == "_wcpdf_document_link")?.value as string;
@@ -29,14 +29,15 @@ namespace Findus.Helpers
                 string orderId = order.id.ToString();
                 if (string.IsNullOrEmpty(orderKey))
                 {
-                    throw new System.Exception(
+                    throw new Exception(
                         $"Order: ${orderId} is missing document_link and order_key"
                     );
                 }
                 else
                 {
+                    // TODO: Interchangable base url
                     pdfLink =
-                        $"https://gamerbulk.com/wp-admin/admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids={orderId}&order_key={orderKey}";
+                        $"{storefrontUrl}/wp-admin/admin-ajax.php?action=generate_wpo_wcpdf&template_type=invoice&order_ids={orderId}&order_key={orderKey}";
                 }
             }
 

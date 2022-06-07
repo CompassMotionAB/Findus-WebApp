@@ -16,12 +16,14 @@ namespace Findus.Helpers
                 { "}", ")" },
                 { "[", "(" },
                 { "]", ")" },
+
             };
 
         // Catch-all pattern:
         //private const string _pattern = @"[\’\\åäöéáœæøüÅÄÖÉÁÜŒÆØ–:\.`´’,;\^¤#%§£$€¢¥©™°&\/\(\)=\+\-\*_\!?²³®½\@\n\r]+";
-        // Pattern that catches disallowed symbols in Fortnox: ^$¢¥|~{}[]
-        private const string _pattern = @"[\^$¢¥\{\}\[\]]+";
+
+        // Pattern catches disallowed symbols in Fortnox: ^$¢¥|~{}[]
+        private const string _pattern = @"[\^$¢¥\{\}\[\]\|]+";
 
         public static string SanitizeStringForFortnox(this string description)
         {

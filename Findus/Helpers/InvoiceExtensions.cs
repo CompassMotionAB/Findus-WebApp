@@ -45,18 +45,6 @@ namespace Findus.Helpers
         public static Invoice SetInvoiceRows(
             this Invoice invoice,
             WcOrder order,
-            AccountsModel accounts,
-            OrderRefund refund
-        )
-        {
-            foreach(var item in refund.line_items) {
-                var acc = accounts.GetSalesAccount(order);
-            }
-            return invoice;
-        }
-        public static Invoice SetInvoiceRows(
-            this Invoice invoice,
-            WcOrder order,
             AccountsModel accounts
         )
         {

@@ -78,10 +78,10 @@ namespace Findus.Helpers
                 throw new Exception("Beställningen behöver bokföras manuellt.");
             }
 
-            // NOTE: Catch-all: stripe & stripe_{bancontant,ideal,sofort}
+            // NOTE: Catch-all: stripe & stripe_{bancontant,ideal,sofort}, but not *_stripe
             if (new Regex(@"^stripe\S*").IsMatch(payment))
                 return "Stripe";
-            // NOTE: Catch-all: paypal & (ppec_paypal)_paypal
+            // NOTE: Catch-all: paypal & (ppec_paypal)_paypal, but not paypal_*
             if (new Regex(@"^\S*paypal$").IsMatch(payment))
                 return "PayPal";
 
@@ -119,21 +119,35 @@ namespace Findus.Helpers
             return line_items.TrueForAll(o => o.tax_class == "reduced-rate");
         }
 
+        private static string TryGetFortnoxExpectedCurrency(WcOrder order, decimal currencyRate) =>
+            order.currency.ToUpper() switch
+            {
+                "SEK"
+                  => (currencyRate == 1M)
+                      ? "SEK"
+                      : throw new Exception($"Unexpected Currency Rate for SEK: {currencyRate}"),
+                "EUR" => "EUR",
+                "USD" => "USD",
+                _ => throw new Exception($"Unexpected Currency for Order: {order.currency}")
+            };
+
         public static Invoice GenInvoice(
             WcOrder order,
             decimal currencyRate,
             AccountsModel accounts,
-            string customerNr = null
+            string customerNr = null,
+            string orderPrefix = null
         )
         {
             if (order.date_paid == null)
                 throw new Exception($"Order Id: {order.id} is missing final payment date");
             if (order.line_items == null || order.line_items.Count < 1)
                 throw new Exception($"Order Id: {order.id} is missing items in order");
-            if (!string.Equals(order.currency, "EUR", StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Expected WooCommerce order to be in EUR");
 
             var invoiceRows = new List<InvoiceRow>();
+
+            bool hasShippingCost = order.shipping_lines.Count > 0 && order.shipping_total > 0;
+            var shippingCost = order.shipping_total ?? 0M;
 
             /*
             order.line_items.ForEach(i =>
@@ -148,6 +162,9 @@ namespace Findus.Helpers
 
             var salesAccount = accounts.GetSalesAccount(order);
 
+            var yourOrderNumber =
+                (orderPrefix != null) ? $"{orderPrefix}-{order.id}" : order.id.ToString();
+
             return new Invoice()
             {
                 CustomerNumber = customerNr,
@@ -155,15 +172,12 @@ namespace Findus.Helpers
                 InvoiceDate = order.date_paid,
                 PaymentWay = PaymentWay.Card,
                 VATIncluded = true,
-                Currency = "EUR",
+                Currency = TryGetFortnoxExpectedCurrency(order, currencyRate),
                 CurrencyRate = currencyRate,
-                // Currency = "SEK",
-                // CurrencyRate = 1,
-
-                YourOrderNumber = order.id.ToString(),
+                YourOrderNumber = yourOrderNumber,
                 //YourReference = order.customer_id?.ToString(), //TODO: Should this be used?
                 OurReference = "Findus",
-                ExternalInvoiceReference1 = order.id?.ToString(),
+                // ExternalInvoiceReference1 = order.id?.ToString(),
                 InvoiceRows = invoiceRows,
             }
                 .AddCustomerData(order)
@@ -173,7 +187,10 @@ namespace Findus.Helpers
                         Accounts = accounts,
                         SalesAcc = salesAccount,
                         Order = order,
-                        CountryIso = order.billing.country
+                        CountryIso = order.billing.country,
+                        HasShippingCost = hasShippingCost,
+                        ShippingCost = shippingCost
+                        // ShippingSEK = (order.shipping_total ?? 0) * currencyRate
                     }
                 );
         }
@@ -253,7 +270,7 @@ namespace Findus.Helpers
                 InvoiceDate = DateTime.Now,
                 PaymentWay = PaymentWay.Card,
                 VATIncluded = true,
-                Currency = "EUR",
+                Currency = TryGetFortnoxExpectedCurrency(order, currencyRate),
                 CurrencyRate = currencyRate,
                 CustomerNumber = customerNr,
                 YourOrderNumber = order.id.ToString(),
@@ -611,13 +628,16 @@ namespace Findus.Helpers
 
         private static Invoice GenInvoiceRows(this Invoice invoice, InvoiceData data)
         {
+            var highestRate = 0M;
             foreach (var item in data.Items())
             {
                 // TODO: Verify that only flat discount (promo code) could attribute to 0 cost item
-                if (item.price == 0.0M && item.subtotal_tax == 0.0M)
-                    continue;
+                // NOTE: Optionally skip 0 cost items
+                // if (item.price == 0.0M && item.subtotal_tax == 0.0M) continue;
                 var isStandard = item.tax_class != "reduced-rate";
                 var salesAcc = data.GetSalesAcc(isStandard, countryIso: data.CountryIso);
+                if (salesAcc.Rate > highestRate)
+                    highestRate = salesAcc.Rate;
                 //var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
                 invoice.AddRow(
                     salesAcc.AccountNr,
@@ -629,6 +649,11 @@ namespace Findus.Helpers
                 //info: $"Försäljning - {taxLabel}"
                 );
             }
+            if (data.HasShippingCost)
+            {
+                invoice.Freight = data.ShippingCost;
+            }
+
             return invoice;
         }
 
@@ -660,8 +685,8 @@ namespace Findus.Helpers
 
                 foreach (var item in data.Items())
                 {
-                    if (item.price == 0.0M && item.subtotal_tax == 0.0M)
-                        continue;
+                    // NOTE: Optionally skip 0 cost items
+                    // if (item.price == 0.0M && item.subtotal_tax == 0.0M) continue;
                     var isStandard = item.tax_class != "reduced-rate";
                     var salesAcc = data.GetSalesAcc(isStandard, countryIso: data.CountryIso);
                     var taxLabel = data.GetTaxLabel(salesAcc, isStandard: isStandard);
@@ -735,7 +760,8 @@ namespace Findus.Helpers
             WcOrder order,
             AccountsModel accounts,
             decimal currencyRate,
-            bool simplify = false
+            bool simplify = false,
+            string orderPrefix = null
         )
         {
             var result = new VerificationModel()
@@ -754,7 +780,7 @@ namespace Findus.Helpers
                     accurateTotal,
                     simplify
                 );
-                result.Invoice = GenInvoice(order, currencyRate, accounts);
+                result.Invoice = GenInvoice(order, currencyRate, accounts, null, orderPrefix);
                 result.Customer = GetCustomer(result.Invoice, order)
                     .AddVatType(order.billing.country);
             }

@@ -8,10 +8,19 @@ using System.Threading.Tasks;
 
 namespace Findus.Helpers
 {
+
+    public class DateComparer : IComparer<DateTime> {
+        public int Compare(DateTime lhs, DateTime rhs) {
+            return DateTime.Compare(lhs, rhs);
+        }
+    }
     public static class CurrencyUtils
     {
+
         public static async Task<decimal> GetSEKCurrencyRateAsync(DateTime date, string currency, HttpClient httpClient)
         {
+            if(currency == "SEK-SEK") return 1M;
+
             string dateStringFrom = String.Format("{0:yyyy-M-d}", date.AddDays(-7));
             string dateStringTo = String.Format("{0:yyyy-M-d}", date);
 
@@ -45,7 +54,9 @@ namespace Findus.Helpers
                 }
             }
 
-            var currencyRate = currencies.Values.Last();
+            var sortedDictonary = new SortedDictionary<DateTime, string>(currencies, new DateComparer());
+
+            var currencyRate = sortedDictonary.Values.Last();
 
             return decimal.Parse(currencyRate);
         }

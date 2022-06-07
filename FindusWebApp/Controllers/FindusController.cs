@@ -47,6 +47,7 @@ namespace FindusWebApp.Controllers
     public class FindusController : Controller
     {
         private readonly WooKeys _wcKeys;
+        private readonly WooCredentials _wooCredentials;
         private readonly WCObject.WCOrderItem _wcOrderApi;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IMemoryCache _memoryCache;
@@ -55,10 +56,13 @@ namespace FindusWebApp.Controllers
         private OrderViewModel _orderViewModel;
         private readonly IFortnoxServices _fortnox;
 
+        private readonly Dictionary<string, RestAPI> _jwts;
+
         public FindusController(
             IHttpClientFactory httpClientFactory,
             IMemoryCache memoryCache,
             IOptions<WooKeys> wcKeysOptions,
+            IOptions<WooCredentials> wooCredentials,
             IFortnoxServices fortnox
         )
         {
@@ -70,20 +74,25 @@ namespace FindusWebApp.Controllers
             _fortnox = fortnox;
 
             _wcKeys = wcKeysOptions.Value;
+            _wooCredentials = wooCredentials.Value;
 
-            if (
-                string.IsNullOrEmpty(_wcKeys.Key)
-                || string.IsNullOrEmpty(_wcKeys.Secret)
-                || string.IsNullOrEmpty(_wcKeys.Url)
-            )
+            foreach (WooKeys keys in _wooCredentials?.WooKeys.Values)
             {
-                ViewBag.Error = "Missing WooKeys Configuration, see appsettings.sample.json";
+                if (
+                    string.IsNullOrEmpty(keys.Key)
+                    || string.IsNullOrEmpty(keys.Secret)
+                    || string.IsNullOrEmpty(keys.Url)
+                )
+                {
+                    ViewBag.Error =
+                        "Missing Valid WooCredentials Configuration, see appsettings.sample.json";
+                    return;
+                }
+
+                _jwts.Add(keys.OrderPrefix, new RestAPI(keys.Url, keys.Key, keys.Secret, false));
             }
-            else
-            {
-                var restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
-                _wcOrderApi = new WCObject.WCOrderItem(restJwt);
-            }
+            var restJwt = new RestAPI(_wcKeys.Url, _wcKeys.Key, _wcKeys.Secret, false);
+            _wcOrderApi = new WCObject.WCOrderItem(restJwt);
             _accounts = new AccountsModel(
                 JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("VATAccounts.json"),
                 JsonUtilities.LoadJson<Dictionary<string, AccountModel>>("SalesAccounts.json")
@@ -248,7 +257,13 @@ namespace FindusWebApp.Controllers
         public async Task<Invoice> VerifyInvoice(WcOrder order, decimal? currencyRate = null)
         {
             currencyRate ??= await GetCurrencyRate(order);
-            return VerificationUtils.GenInvoice(order, (decimal)currencyRate, _accounts);
+            return VerificationUtils.GenInvoice(
+                order,
+                (decimal)currencyRate,
+                _accounts,
+                null,
+                _wcKeys.OrderPrefix
+            );
         }
 
         private async Task<bool> VerifyOrderBool(WcOrder order)
@@ -321,19 +336,35 @@ namespace FindusWebApp.Controllers
 
             var refunds = await _wcOrderApi.Refunds.GetAll(order.id);
 
-            if (refunds.Count != 0)
+            if (refunds.Count == 0)
             {
                 throw new Exception("Order is missing refunds");
             }
             else if (refunds.Count != 1)
             {
-                throw new Exception("Partial Refund for previously refunded order is not supported.");
+                throw new Exception(
+                    "Partial Refund for previously refunded order is not supported."
+                );
             }
 
-            var updateInvoice = new Invoice()
+            var updateInvoice = new Invoice() { DocumentNumber = creditInvoice.DocumentNumber };
+
+            // WIP
+            foreach (var item in order.line_items)
             {
-                DocumentNumber = creditInvoice.DocumentNumber
-            }.SetInvoiceRows(order, _accounts, refunds[0]);
+                // Get tax_class
+                foreach (var refundItem in order.refunds) { }
+                updateInvoice.InvoiceRows.Add(
+                    new InvoiceRow
+                    {
+                        // AccountNumber
+                        // DeliveredQuantity
+                        // Price
+                        // Discount
+                        // ArticleNumber
+                    }
+                );
+            }
 
             return updateInvoice;
             // TODO: make sure invoice is correct before we upload
@@ -452,14 +483,13 @@ namespace FindusWebApp.Controllers
                             if (VerificationUtils.CanBeRefunded(order, invoice, ref errors))
                             {
                                 warnings.Add(orderId, "This is a Partial refund.");
+                                // Partial refund
+                                var invoiceWithCredit = await TryCreatePartialRefund(
+                                    order,
+                                    invoice
+                                );
                                 if (applyRefunds)
                                 {
-                                    // Partial refund
-                                    var invoiceWithCredit = await TryCreatePartialRefund(
-                                        order,
-                                        invoice
-                                    );
-
                                     // Add external reference to order ID
                                     // invoice.ExternalInvoiceReference2 = refundId;
                                     // await UpdateInvoice(invoice);
@@ -472,7 +502,7 @@ namespace FindusWebApp.Controllers
                                     */
                                 }
 
-                                invoices.Add(orderId, invoice);
+                                invoices.Add(orderId, invoiceWithCredit);
                             }
                         }
                         catch (Exception ex)
@@ -644,7 +674,13 @@ namespace FindusWebApp.Controllers
                 accurateTotal,
                 simplify: simplify
             );
-            TempData["Invoice"] = VerificationUtils.GenInvoice(order, currencyRate, _accounts);
+            TempData["Invoice"] = VerificationUtils.GenInvoice(
+                order,
+                currencyRate,
+                _accounts,
+                null,
+                _wcKeys.OrderPrefix
+            );
         }
 
         public async Task<string> DEBUG_VerifyDates(
@@ -699,21 +735,21 @@ namespace FindusWebApp.Controllers
         {
             if (TempData["pdf"] is not byte[] pdf)
                 throw new Exception("PDF data missing for upload.");
-            if (TempData["invoiceNr"] is not long invoiceNr)
-                throw new Exception("Document number missing for PDF upload.");
-            if (TempData["orderId"] is not string orderId)
-                throw new Exception("Order Id is missing for PDF upload.");
+            if (TempData["documentNumber"] is not long documentNumber)
+                throw new Exception("Invoice.DocumentNumber missing for PDF upload.");
+            if (TempData["yourOrderNumber"] is not string yourOrderNumber)
+                throw new Exception("Invoice.YourOrderNumber is missing for PDF upload.");
 
             var connector = context.Client.InvoiceFileConnectionConnector;
             var inboxConnector = context.Client.InboxConnector;
             var tmpFile = await inboxConnector.UploadFileAsync(
-                $"invoice-{orderId}.pdf",
+                $"invoice-{yourOrderNumber}.pdf",
                 pdf,
                 StaticFolders.CustomerInvoices
             );
             var newInvoiceFileConnection = new InvoiceFileConnection()
             {
-                EntityId = invoiceNr,
+                EntityId = documentNumber,
                 FileId = tmpFile.ArchiveFileId,
                 IncludeOnSend = false,
                 EntityType = EntityType.Invoice
@@ -721,12 +757,20 @@ namespace FindusWebApp.Controllers
             await connector.CreateAsync(newInvoiceFileConnection);
         }
 
-        private async Task UploadPDF(byte[] pdf, long? invoiceNr, ulong orderId)
+        private async Task<bool> UploadPDF(byte[] pdf, long? documentNumber, string yourOrderNumber)
         {
             TempData["pdf"] = pdf;
-            TempData["invoiceNr"] = invoiceNr;
-            TempData["orderId"] = orderId.ToString();
-            await Call(UploadPDFToFortnox);
+            TempData["documentNumber"] = documentNumber;
+            TempData["yourOrderNumber"] = yourOrderNumber;
+            try
+            {
+                await Call(UploadPDFToFortnox);
+            }
+            catch (Exception _ex)
+            {
+                return false;
+            }
+            return true;
         }
 
         private void FetchCompanyName(FortnoxContext context)
@@ -736,7 +780,11 @@ namespace FindusWebApp.Controllers
             ViewData["CompanyName"] = conn.GetAsync().Result.CompanyName;
         }
 
-        public async Task<IActionResult> AddMissingPDF(string orderId = null)
+        public async Task<IActionResult> AddMissingPDF(
+            string orderId = null,
+            long? documentNumber = 0,
+            byte[] pdfData = null
+        )
         {
             if (string.IsNullOrEmpty(orderId))
                 return new BadRequestResult();
@@ -746,12 +794,23 @@ namespace FindusWebApp.Controllers
             {
                 return new BadRequestResult();
             }
-            var invoice = await GetInvoiceFromOrderId(orderId);
-            if (invoice == null)
-                return new BadRequestResult();
+            if (documentNumber == 0)
+            {
+                var invoice = await GetInvoiceFromOrderId(orderId);
+                if (invoice == null)
+                    return new BadRequestResult();
+                documentNumber = invoice.DocumentNumber;
+            }
+            if (pdfData == null)
+                pdfData = await FetchFile(order.TryGetDocumentLink(_wcKeys.StorefrontURL));
 
-            var pdf = await FetchFile(order.TryGetDocumentLink());
-            await UploadPDF(pdf, invoice.DocumentNumber, Convert.ToUInt64(orderId));
+            await UploadPDF(
+                pdfData,
+                documentNumber,
+                string.IsNullOrEmpty(_wcKeys.OrderPrefix)
+                  ? orderId
+                  : $"{_wcKeys.OrderPrefix}-{orderId}"
+            );
             return View("Findus");
         }
 
@@ -819,7 +878,9 @@ namespace FindusWebApp.Controllers
                             VerificationModel verification = VerificationUtils.Verify(
                                 order,
                                 _accounts,
-                                currencyRate
+                                currencyRate,
+                                false,
+                                _wcKeys.OrderPrefix
                             );
                             if (verification.IsValid())
                             {
@@ -829,7 +890,9 @@ namespace FindusWebApp.Controllers
 
                                     if (order.HasDocumentLink())
                                     {
-                                        verification.PdfLink = order.TryGetDocumentLink();
+                                        verification.PdfLink = order.TryGetDocumentLink(
+                                            _wcKeys.StorefrontURL
+                                        );
 
                                         var success = await SendToFortnox(verification);
                                         if (!success || !string.IsNullOrEmpty(ViewBag.Error))
@@ -895,19 +958,11 @@ namespace FindusWebApp.Controllers
             try
             {
                 string customerNr;
-                try
-                {
-                    var customer = verification.Customer;
-                    TempData["Customer"] = customer;
-                    customerNr = await UpdateCustomerAsync(customer);
+                var customer = verification.Customer;
+                TempData["Customer"] = customer;
+                customerNr = await UpdateCustomerAsync(customer);
 
-                    TempData["CustomerNr"] = customerNr ?? TempData["CustomerNr"];
-                }
-                catch (Exception ex)
-                {
-                    ViewBag.Error = ex.Message;
-                    return false;
-                }
+                TempData["CustomerNr"] = customerNr ?? TempData["CustomerNr"];
                 if (string.IsNullOrEmpty(customerNr))
                 {
                     ViewBag.Error ??=
@@ -930,15 +985,44 @@ namespace FindusWebApp.Controllers
 
                 TempData["Invoice"] = verification.Invoice;
                 TempData["PdfLink"] = verification.PdfLink;
-                try
+
+                var pdf = await FetchFile(verification.PdfLink);
+
+                // Needed to wait for 'Articles' to be updated remotely
+                // TODO: wait relative to amount of articles
+                Thread.Sleep(2600);
+
+                await Call(CreateFortnoxInvoice);
+
+                Thread.Sleep(1600);
+
+                if (TempData["Invoice"] is not Invoice invoice)
                 {
-                    await Call(CreateFortnoxInvoice);
+                    throw new Exception("Failed to upload Invoice");
                 }
-                catch (Exception ex)
+
+                Thread.Sleep(1600);
+
+                var result = await UploadPDF(pdf, invoice.DocumentNumber, invoice.YourOrderNumber);
+                if (!result)
                 {
-                    ViewBag.Error = ex.Message;
-                    return false;
+                    try
+                    {
+                        await AddMissingPDF(verification.OrderId, invoice.DocumentNumber, pdf);
+                    }
+                    catch (Exception _ex)
+                    {
+                        throw new Exception("Failed to upload PDF");
+                    }
                 }
+
+                /*
+                await _wcOrderApi.AddInvoiceReferenceAsync(
+                    invoice.YourOrderNumber,
+                    invoice.DocumentNumber
+                );
+                */
+
             }
             catch (Exception ex)
             {
@@ -996,12 +1080,11 @@ namespace FindusWebApp.Controllers
                 new InvoiceSearch { YourOrderNumber = orderId }
             );
 
-            // TODO: TEMPORARY:
-            /*
             if (invoiceSubset?.Entities.Count > 1)
             {
                 throw new Exception("Flera kunder med samma Email existerar i Fortnox.");
-            } else*/if (invoiceSubset?.Entities.Count == 1)
+            }
+            else if (invoiceSubset?.Entities.Count == 1)
             {
                 TempData["InvoiceNumber"] = invoiceSubset?.Entities[0].DocumentNumber.ToString();
                 hasOrder = true;
@@ -1186,6 +1269,8 @@ namespace FindusWebApp.Controllers
         private async void UpdateArticles(FortnoxContext context)
         {
             // TODO: better exception error message matching in this function.
+            // TODO: Count amount of new uploaded articles and Sleep execution appropriately
+            // to allow Fortnox to receive new Articles before Invoice creation.
 
             if (TempData["OrderItems"] is not List<OrderLineItem> items)
                 throw new Exception("OrderItems is not defined.");
@@ -1207,7 +1292,7 @@ namespace FindusWebApp.Controllers
                     catch (Exception ex)
                     {
                         if (
-                            !String.Equals(
+                            !string.Equals(
                                 ex.Message,
                                 $"Request failed: Artikelnummer \"{item.sku}\" används redan."
                             )
@@ -1224,7 +1309,6 @@ namespace FindusWebApp.Controllers
         {
             var httpClient = _httpClientFactory.CreateClient();
             var pdf = await httpClient.FetchFile(fileLink);
-            httpClient.Dispose();
             return pdf;
         }
 
@@ -1237,6 +1321,17 @@ namespace FindusWebApp.Controllers
             try
             {
                 invoice = await invoiceCon.CreateAsync(invoice);
+
+                TempData["Invoice"] = invoice;
+                // Send PDF Invoice
+                /*
+                if (TempData["PdfLink"] is string pdfLink)
+                {
+                    var pdf = await FetchFile(pdfLink);
+                    await UploadPDF(pdf, invoice.DocumentNumber, invoice.YourOrderNumber);
+                }
+                */
+
                 /*
                 await _wcOrderApi.AddInvoiceReferenceAsync(
                     invoice.YourOrderNumber,
@@ -1244,16 +1339,6 @@ namespace FindusWebApp.Controllers
                 );
                 */
 
-                // Send PDF Invoice
-                if (TempData["PdfLink"] is string pdfLink)
-                {
-                    var pdf = await FetchFile(pdfLink);
-                    await UploadPDF(
-                        pdf,
-                        invoice.DocumentNumber,
-                        Convert.ToUInt64(invoice.YourOrderNumber)
-                    );
-                }
             }
             catch (Exception ex)
             {

@@ -10,7 +10,6 @@ namespace Findus.Helpers
             if (
                 item.tax_class == "reduced-rate"
                 || item.tax_class == "normal-rate"
-                || string.IsNullOrEmpty(item.tax_class)
             )
             {
                 throw new Exception(

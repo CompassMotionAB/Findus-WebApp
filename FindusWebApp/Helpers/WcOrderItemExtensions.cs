@@ -10,6 +10,7 @@ using WooCommerceNET.WooCommerce.v2;
 using Findus.Helpers;
 using System.Linq;
 using Findus.Models;
+using System.Text.RegularExpressions;
 
 namespace FindusWebApp.Helpers
 {
@@ -269,8 +270,9 @@ namespace FindusWebApp.Helpers
             long? invoiceNumber
         )
         {
+            var id = Regex.Replace(orderId, @"^\D*-",  "");
             await wcOrderApi.Update(
-                Convert.ToInt32(orderId),
+                Convert.ToInt32(id),
                 new WcOrder
                 {
                     meta_data = new List<OrderMeta>

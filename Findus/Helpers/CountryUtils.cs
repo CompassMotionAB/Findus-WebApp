@@ -12,6 +12,7 @@ namespace Findus.Helpers
                 return countryCode.ToUpper() switch
                 {
                     "SE" => "Sverige",
+                    "CN" => "China",
                     "CZ" => "Czech Republic",
                     _ => new RegionInfo(countryCode).EnglishName
                 };
