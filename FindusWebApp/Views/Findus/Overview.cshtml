@@ -1,15 +1,7 @@
 @model FindusWebApp.Models.OrderViewModel
 
 @{
-
-    var OrderSelect = @Model?.OrderSelect;
-    var Invoice = @Model?.Invoice;
-
-
     System.Globalization.CultureInfo Swe = new System.Globalization.CultureInfo("sv-SE");
-
-    string TotalDebit = @Model?.TotalDebit != null ? ((decimal)@Model.TotalDebit).ToString("N2", Swe) : null;
-    string TotalCredit = @Model?.TotalCredit != null ? ((decimal)@Model.TotalCredit).ToString("N2", Swe) : null;
 }
 
 <div class="form-group">
@@ -19,31 +11,8 @@
     @if (@Model != null)
     {
 
-        @if (Invoice != null)
+        @if (Model.OrderSelect != null)
         {
-            @if (TotalDebit != null || TotalCredit != null)
-            {
-                <table class="Grid" style="width: 50%" cellpadding="0" cellspacing="0">
-                    <tr>
-                        <th>Total Debet</th>
-                        <th>Total Kredit</th>
-                    </tr>
-                    <tr>
-                        <td style="max-width: 100px;">
-                            @($"{TotalDebit} Kr")
-                        </td>
-                        <td style="max-width: 100px;">
-                            @($"{TotalCredit} Kr")
-                        </td>
-                    </tr>
-                </table>
-            }
-            <partial name="Partial/InvoiceAccrual" model="Invoice" />
-        }
-
-        @if (OrderSelect != null)
-        {
-            @Html.ActionLink("Lägg till Order, Faktura & Produkt till Fortnox","SendToFortnox", "Findus", new {orderId = (Model.OrderRoute.HasDateRange() ? null : Model.OrderRoute.OrderId), dateFrom = Model.OrderRoute.DateFrom, dateTo = Model.OrderRoute.DateTo})
             <table class="Grid" cellpadding="0" cellspacing="0">
                 <tr>
                     <th></th>
@@ -54,7 +23,8 @@
                 @foreach (var order in Model.OrderSelect)
                 {
                     string warning = @Model.GetWarning(order.Value);
-                    string error = warning == null ? @Model.GetError(order.Value) : null;
+                    //string error = warning == null ? @Model.GetError(order.Value) : null;
+                    string error = @Model.GetError(order.Value);
                     var invoice = error != null ? @Model.GetInvoice(order.Value) : null;
 
                     <tr>
@@ -73,7 +43,7 @@
                                 @Html.ActionLink("Send to Fortnox","SendToFortnox", "Findus", new {orderId = order.Value})
                             }
                         </td>
-                        @* <td><input type='checkbox' value='false' /></td> *@
+                        <td><input type='checkbox' value='false' /></td>
                     </tr>
                     <tr>
                         <td></td>

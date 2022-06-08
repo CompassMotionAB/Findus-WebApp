@@ -12,6 +12,7 @@ namespace Findus.Models {
             Status = status;
         }
 
+        // TODO: turn these functions into properties instead
         public bool HasDateRange() => !string.IsNullOrEmpty(DateFrom) && !string.IsNullOrEmpty(DateTo);
         public bool IsValid() => OrderId != null || HasDateRange();
     }

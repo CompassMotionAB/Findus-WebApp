@@ -10,6 +10,7 @@ using WooCommerceNET.WooCommerce.v2;
 using Findus.Helpers;
 using System.Linq;
 using Findus.Models;
+using System.Text.RegularExpressions;
 
 namespace FindusWebApp.Helpers
 {
@@ -65,7 +66,8 @@ namespace FindusWebApp.Helpers
             string dateTo = null,
             IMemoryCache memoryCache = null,
             int pageNumber = 1,
-            string orderStatus = "completed"
+            string orderStatus = "completed",
+            string cacheKeyData = ""
         )
         {
             if (memoryCache is null)
@@ -90,7 +92,7 @@ namespace FindusWebApp.Helpers
                 .ParseExact(dateTo, "yyyy-MM-dd", CultureInfo.InvariantCulture)
                 .EndOfDay();
 
-            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders";
+            var cacheKey = $"{dateAfter:yyyy-MM-dd}_{dateBefore:yyyy-MM-dd}-orders{cacheKeyData}";
 
             if (!memoryCache.TryGetValue(cacheKey, out List<WcOrder> orders))
             {
@@ -135,6 +137,7 @@ namespace FindusWebApp.Helpers
 
                 memoryCache.Set(cacheKey, orders, _orderCacheOptions);
             }
+
             return orders;
         }
 
@@ -163,7 +166,8 @@ namespace FindusWebApp.Helpers
             // Try to get order from cache
             var order = TryGetCachedOrder(orderRoute.OrderId, memoryCache);
 
-            return order ?? await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status, memoryCache);
+            return order
+                ?? await wcOrderApi.GetOrder(orderRoute.OrderId, orderRoute.Status, memoryCache);
         }
 
         public static async Task<WcOrder> GetOrder(
@@ -177,13 +181,15 @@ namespace FindusWebApp.Helpers
             {
                 throw new ArgumentNullException(paramName: nameof(orderId));
             }
-            if(memoryCache != null) {
-                if(memoryCache.TryGetValue(orderId, out WcOrder cachedOrder)) {
+            if (memoryCache != null)
+            {
+                if (memoryCache.TryGetValue(orderId, out WcOrder cachedOrder))
+                {
                     return cachedOrder;
                 }
             }
             var order = await wcOrderApi.Get(
-                (int)Convert.ToUInt64(orderId),
+                Convert.ToInt32(orderId),
                 new Dictionary<string, string> { { "status", orderStatus } }
             );
             if (order?.status != orderStatus)
@@ -209,6 +215,72 @@ namespace FindusWebApp.Helpers
             }
             memoryCache?.Set(orderId, order, _orderCacheOptions);
             return order;
+        }
+
+        public static async Task<IEnumerable<WcOrder>> TryGetPartialRefundedOrders(
+            this WCObject.WCOrderItem wcOrderApi,
+            OrderRouteModel orderRoute,
+            IMemoryCache memoryCache = null,
+            int pageNumber = 1,
+            string orderStatus = "completed"
+        )
+        {
+            if (!orderRoute.IsValid())
+                throw new Exception("Order route is not valid.");
+            List<WcOrder> orders;
+            if (orderRoute.HasDateRange())
+            {
+                orders = await wcOrderApi.GetOrders(
+                    orderRoute.DateFrom,
+                    orderRoute.DateTo,
+                    memoryCache,
+                    pageNumber,
+                    orderStatus
+                );
+            }
+            else
+            {
+                orders = new List<WcOrder> { await wcOrderApi.Get(orderRoute.OrderId) };
+            }
+            return orders.FindAll(o => o.refunds?.Count > 0);
+        }
+
+        public static async Task<IEnumerable<WcOrder>> GetPartialRefundedOrders(
+            this WCObject.WCOrderItem wcOrderApi,
+            string dateFrom = null,
+            string dateTo = null,
+            IMemoryCache memoryCache = null,
+            int pageNumber = 1,
+            string orderStatus = "completed"
+        )
+        {
+            var orders = await wcOrderApi.GetOrders(
+                dateFrom,
+                dateTo,
+                memoryCache,
+                pageNumber,
+                orderStatus
+            );
+            return orders.FindAll(o => o.refunds?.Count > 0);
+        }
+
+        public static async Task AddInvoiceReferenceAsync(
+            this WCObject.WCOrderItem wcOrderApi,
+            string orderId,
+            long? invoiceNumber
+        )
+        {
+            var id = Regex.Replace(orderId, @"^\D*-",  "");
+            await wcOrderApi.Update(
+                Convert.ToInt32(id),
+                new WcOrder
+                {
+                    meta_data = new List<OrderMeta>
+                    {
+                        new OrderMeta { key = "_fortnox_invoice_number", value = invoiceNumber, }
+                    }
+                }
+            );
         }
     }
 }

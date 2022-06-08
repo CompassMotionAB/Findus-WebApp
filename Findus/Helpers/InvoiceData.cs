@@ -80,6 +80,8 @@ namespace Findus.Helpers
         public decimal ShippingVatSEK;
         public decimal ShippingTotalSEK => ShippingSEK + ShippingVatSEK;
 
+        public decimal ShippingCost;
+
         public decimal CartTaxSEK { get; internal set; }
         public decimal TotalItemsTaxSEK { get; internal set; }
         public string CountryIso { get => countryIso ?? Order.billing.country; set => countryIso = value; }

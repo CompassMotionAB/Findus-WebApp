@@ -26,5 +26,6 @@ namespace FindusWebApp.Helpers
         {
             return str.Split(delimiter);
         }
+
     }
 }

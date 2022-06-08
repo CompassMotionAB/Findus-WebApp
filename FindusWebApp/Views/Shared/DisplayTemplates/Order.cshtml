@@ -50,8 +50,8 @@
         <th>Netto</th>
     </tr>
     <tr>
-        <td>@Model.total EUR -> @($"{TotalSek:0.##} kr")</td>
-        <td> 1.0 EUR -> @($"{CurrencyRate:0.######} kr")</td>
+        <td>@Model.total @Model.currency -> @($"{TotalSek:0.##} kr")</td>
+        <td> 1.0 @Model.currency -> @($"{CurrencyRate:0.######} kr")</td>
         <td>@($"{StripeFee:0.##} kr")</td>
         <td>@StripeNet kr</td>
     </tr>
@@ -61,7 +61,7 @@
 </table>
 
     <br />
-    <h3 style="display: inline;">Cost Summary </h3><span>(in EUR)</span>
+    <h3 style="display: inline;">Cost Summary </h3><span>(in @Model.currency)</span>
     <table>
     <col>
     <col>
